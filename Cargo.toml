@@ -1,0 +1,24 @@
+[package]
+name = "sanctum-spl-stake-pool-cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "splsp"
+path = "src/main.rs"
+
+
+[dependencies]
+clap = { version = "^4", features = ["derive"] }
+tokio = { version = "^1", features = ["rt-multi-thread"] }
+
+# sanctum-solana-utils
+spl_stake_pool_interface = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "d5cbf4b" }
+sanctum-solana-cli-utils = { features = ["clap"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "d5cbf4b" }
+sanctum-spl-stake-pool-lib = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "d5cbf4b" }
+
+# solana
+solana-account-decoder = "^1.18" # need to explicitly specify or cargo pulls 1.5 for some goddamn reason
+solana-client = "^1.18" # need to explicitly specify or cargo pulls 1.5 for some goddamn reason
+solana-transaction-status = "^1.18" # need to explicitly specify or cargo pulls 1.5 for some goddamn reason
+solana-sdk = "^1.18"
