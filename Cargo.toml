@@ -10,12 +10,14 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "^4", features = ["derive"] }
+serde = { version = "^1", features = ["derive"] }
 tokio = { version = "^1", features = ["rt-multi-thread"] }
+toml = "^0.5" # borsh-derive 0.9 -> proc-macro-crate 0.1.5 -> toml ^0.5
 
 # sanctum-solana-utils
-spl_stake_pool_interface = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "d5cbf4b" }
-sanctum-solana-cli-utils = { features = ["clap"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "d5cbf4b" }
-sanctum-spl-stake-pool-lib = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "d5cbf4b" }
+spl_stake_pool_interface = { features = ["serde"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "067c802" }
+sanctum-solana-cli-utils = { features = ["clap"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "067c802" }
+sanctum-spl-stake-pool-lib = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "067c802" }
 
 # solana
 solana-account-decoder = "^1.18" # need to explicitly specify or cargo pulls 1.5 for some goddamn reason

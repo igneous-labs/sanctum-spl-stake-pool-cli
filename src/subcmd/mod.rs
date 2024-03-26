@@ -12,7 +12,6 @@ pub enum Subcmd {
     List(ListArgs),
 }
 
-
 impl Subcmd {
     pub async fn run(args: crate::Args) {
         match args.subcmd {

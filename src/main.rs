@@ -1,6 +1,9 @@
 use std::str::FromStr;
 
-use clap::{builder::{StringValueParser, TypedValueParser, ValueParser}, Parser};
+use clap::{
+    builder::{StringValueParser, TypedValueParser, ValueParser},
+    Parser,
+};
 use sanctum_solana_cli_utils::{ConfigWrapper, TxSendMode};
 use solana_sdk::pubkey::Pubkey;
 use subcmd::Subcmd;
@@ -31,6 +34,17 @@ pub struct Args {
         value_enum,
     )]
     pub send_mode: TxSendMode,
+
+    #[arg(
+        long,
+        short,
+        help = "0 - disable ComputeBudgetInstruction prepending.
+Any positive integer: enable dynamic CU calculation
+- before sending a TX, simulate the tx and prepend with appropriate ComputeBudgetInstructions.
+This arg is the max priority fee the user will pay per transaction in lamports.",
+        default_value_t = 1
+    )]
+    pub cu_fee_limit: u64,
 
     #[arg(
         long,

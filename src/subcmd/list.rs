@@ -12,7 +12,7 @@ pub struct ListArgs {
     pub verbose: bool,
 
     #[arg(
-        help = "Address of the stake pool. Can either be a base58-encoded pubkey or keypair file",
+        help = "Address of the stake pool. Can either be a base58-encoded pubkey or keypair file"
     )]
     pub pool: String,
 }
