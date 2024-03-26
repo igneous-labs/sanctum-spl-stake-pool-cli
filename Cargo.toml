@@ -11,8 +11,9 @@ path = "src/main.rs"
 [dependencies]
 clap = { version = "^4", features = ["derive"] }
 serde = { version = "^1", features = ["derive"] }
+solana-readonly-account = { version = "^1", features = ["solana-sdk"] }
 tokio = { version = "^1", features = ["rt-multi-thread"] }
-toml = "^0.5" # borsh-derive 0.9 -> proc-macro-crate 0.1.5 -> toml ^0.5
+toml = "^0.8" # borsh-derive 0.9 -> proc-macro-crate 0.1.5 -> toml ^0.5, but 0.5 has the ValueAfterTable bug so we're getting 2 toml vers
 
 # sanctum-solana-utils
 spl_stake_pool_interface = { features = ["serde"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "067c802" }
