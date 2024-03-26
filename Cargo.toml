@@ -24,3 +24,6 @@ solana-account-decoder = "^1.18" # need to explicitly specify or cargo pulls 1.5
 solana-client = "^1.18" # need to explicitly specify or cargo pulls 1.5 for some goddamn reason
 solana-transaction-status = "^1.18" # need to explicitly specify or cargo pulls 1.5 for some goddamn reason
 solana-sdk = "^1.18"
+
+[dev-dependencies]
+sanctum-solana-test-utils = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "067c802" }

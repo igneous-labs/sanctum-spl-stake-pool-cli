@@ -9,6 +9,7 @@ use solana_sdk::pubkey::Pubkey;
 use subcmd::Subcmd;
 use tokio::runtime::Runtime;
 
+mod pool_config;
 mod subcmd;
 
 #[derive(Parser, Debug)]

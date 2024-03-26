@@ -15,7 +15,7 @@ mint = "EBm88rgvrZZeD2Rq1rEiXqT36VdK2ew1XYitn7Cji8Lc" # must be initialized befo
 # preferred-deposit-validator = "BLADE1qNA1uNjRgER6DtUFf7FU3c1TWLLdpPeEcKatZ2" # defaults to None if not specified
 # preferred-withdraw-validator = "FnAPJkzf19s87sm24Qhv6bHZMZvZ43gjNUBRgjwXpD4v" # defaults to None if not specified
 
-max-validator = 10
+max-validators = 10
 validators = [
     "BLADE1qNA1uNjRgER6DtUFf7FU3c1TWLLdpPeEcKatZ2",
     "FnAPJkzf19s87sm24Qhv6bHZMZvZ43gjNUBRgjwXpD4v",
