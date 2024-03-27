@@ -3373,6 +3373,7 @@ name = "sanctum-spl-stake-pool-cli"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "borsh 1.4.0",
  "clap 4.5.4",
  "sanctum-associated-token-lib",
  "sanctum-macros",

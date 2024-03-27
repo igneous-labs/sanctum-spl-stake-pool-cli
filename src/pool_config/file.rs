@@ -1,14 +1,14 @@
 use std::{fs::read_to_string, num::NonZeroU32, path::Path};
 
 use serde::{Deserialize, Serialize};
-use spl_stake_pool_interface::{Fee, StakeStatus, ValidatorStakeInfo};
+use spl_stake_pool_interface::{Fee, FutureEpochFee, StakeStatus, ValidatorStakeInfo};
 
 #[derive(Debug, Deserialize, Serialize)]
 struct ConfigFileTomlFile {
     pub pool: ConfigFileRaw,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ConfigFileRaw {
     pub mint: Option<String>,
@@ -24,7 +24,6 @@ pub struct ConfigFileRaw {
     pub preferred_deposit_validator: Option<String>,
     pub preferred_withdraw_validator: Option<String>,
     pub max_validators: Option<u32>,
-    pub validators: Option<Vec<ValidatorConfigRaw>>,
     pub stake_deposit_referral_fee: Option<u8>,
     pub sol_deposit_referral_fee: Option<u8>,
     pub epoch_fee: Option<Fee>,
@@ -32,6 +31,16 @@ pub struct ConfigFileRaw {
     pub sol_withdrawal_fee: Option<Fee>,
     pub stake_deposit_fee: Option<Fee>,
     pub sol_deposit_fee: Option<Fee>,
+    pub total_lamports: Option<u64>,
+    pub pool_token_supply: Option<u64>,
+    pub last_update_epoch: Option<u64>,
+    pub next_epoch_fee: Option<FutureEpochFee>,
+    pub next_stake_withdrawal_fee: Option<FutureEpochFee>,
+    pub next_sol_withdrawal_fee: Option<FutureEpochFee>,
+    pub last_epoch_pool_token_supply: Option<u64>,
+    pub last_epoch_total_lamports: Option<u64>,
+    // put this last so it gets outputted last in toml Serialize
+    pub validators: Option<Vec<ValidatorConfigRaw>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
