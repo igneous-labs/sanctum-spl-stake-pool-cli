@@ -12,8 +12,8 @@ struct ConfigFileTomlFile {
 #[serde(rename_all = "kebab-case")]
 pub struct ConfigFileRaw {
     pub mint: Option<String>,
-    pub pool_keypair: Option<String>,
-    pub validator_list_keypair: Option<String>,
+    pub pool: Option<String>,
+    pub validator_list: Option<String>,
     pub reserve: Option<String>,
     pub manager: Option<String>,
     pub manager_fee_account: Option<String>,

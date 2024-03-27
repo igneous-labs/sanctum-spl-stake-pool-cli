@@ -7,24 +7,30 @@ edition = "2021"
 name = "splsp"
 path = "src/main.rs"
 
-
 [dependencies]
+bincode = "^1"
 clap = { version = "^4", features = ["derive"] }
+sanctum-macros = "^1"
 serde = { version = "^1", features = ["derive"] }
 solana-readonly-account = { version = "^1", features = ["solana-sdk"] }
+spl-token-2022 = "^1"
 tokio = { version = "^1", features = ["rt-multi-thread"] }
 toml = "^0.8" # borsh-derive 0.9 -> proc-macro-crate 0.1.5 -> toml ^0.5, but 0.5 has the ValueAfterTable bug so we're getting 2 toml vers
 
 # sanctum-solana-utils
+spl_associated_token_account_interface = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "067c802" }
 spl_stake_pool_interface = { features = ["serde"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "067c802" }
+sanctum-associated-token-lib = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "067c802" }
 sanctum-solana-cli-utils = { features = ["clap"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "067c802" }
 sanctum-spl-stake-pool-lib = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "067c802" }
 
 # solana
 solana-account-decoder = "^1.18" # need to explicitly specify or cargo pulls 1.5 for some goddamn reason
 solana-client = "^1.18" # need to explicitly specify or cargo pulls 1.5 for some goddamn reason
-solana-transaction-status = "^1.18" # need to explicitly specify or cargo pulls 1.5 for some goddamn reason
+solana-program = "^1.18"
 solana-sdk = "^1.18"
+solana-transaction-status = "^1.18" # need to explicitly specify or cargo pulls 1.5 for some goddamn reason
 
 [dev-dependencies]
-sanctum-solana-test-utils = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "067c802" }
+sanctum-solana-test-utils = { features = ["token"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "067c802" }
+spl-token = "^4"

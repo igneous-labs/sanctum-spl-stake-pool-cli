@@ -1,7 +1,7 @@
 [pool]
 mint = "EBm88rgvrZZeD2Rq1rEiXqT36VdK2ew1XYitn7Cji8Lc" # must be initialized beforehand
-# pool-keypair = "./test-fixtures/example-pool-keypair.json" # defaults to randomly-generated if not specified
-# validator-list-keypair = "./test-fixtures/example-validator-list-keypair.json" # defaults to randomly-generated if not specified
+# pool = "./test-fixtures/example-pool-keypair.json" # defaults to randomly-generated if not specified
+# validator-list = "./test-fixtures/example-validator-list-keypair.json" # defaults to randomly-generated if not specified
 # reserve = "./test-fixtures/example-validator-list-keypair.json" # defaults to randomly-generated keypair if not specified
 
 # manager = "./test-fixtures/example-manager.json" # defaults to config wallet if not specified

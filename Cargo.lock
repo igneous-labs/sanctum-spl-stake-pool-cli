@@ -3308,6 +3308,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "sanctum-associated-token-lib"
+version = "0.1.0"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=067c802#067c8027c28233a71e5079b90430a42292519d49"
+dependencies = [
+ "solana-program",
+ "solana-readonly-account",
+ "spl_associated_token_account_interface",
+]
+
+[[package]]
+name = "sanctum-macros"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23668fc5661fe63573abfbb823e3bfe246d3939dafbf56d361a9b3dbea72fa0d"
+dependencies = [
+ "heck 0.5.0",
+ "proc-macro2",
+ "quote",
+ "solana-program",
+ "syn 2.0.55",
+]
+
+[[package]]
 name = "sanctum-solana-cli-utils"
 version = "0.2.0"
 source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=067c802#067c8027c28233a71e5079b90430a42292519d49"
@@ -3342,22 +3365,30 @@ dependencies = [
  "solana-program-test",
  "solana-readonly-account",
  "solana-sdk",
+ "spl-token",
 ]
 
 [[package]]
 name = "sanctum-spl-stake-pool-cli"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "clap 4.5.4",
+ "sanctum-associated-token-lib",
+ "sanctum-macros",
  "sanctum-solana-cli-utils",
  "sanctum-solana-test-utils",
  "sanctum-spl-stake-pool-lib",
  "serde",
  "solana-account-decoder",
  "solana-client",
+ "solana-program",
  "solana-readonly-account",
  "solana-sdk",
  "solana-transaction-status",
+ "spl-token",
+ "spl-token-2022",
+ "spl_associated_token_account_interface",
  "spl_stake_pool_interface",
  "tokio",
  "toml 0.8.12",
@@ -5071,6 +5102,18 @@ dependencies = [
  "spl-discriminator",
  "spl-pod",
  "spl-program-error",
+]
+
+[[package]]
+name = "spl_associated_token_account_interface"
+version = "2.0.0"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=067c802#067c8027c28233a71e5079b90430a42292519d49"
+dependencies = [
+ "borsh 1.4.0",
+ "num-derive 0.4.2",
+ "num-traits",
+ "solana-program",
+ "thiserror",
 ]
 
 [[package]]

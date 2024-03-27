@@ -9,8 +9,14 @@ use solana_sdk::pubkey::Pubkey;
 use subcmd::Subcmd;
 use tokio::runtime::Runtime;
 
+mod consts;
+mod parse;
 mod pool_config;
 mod subcmd;
+mod tx_utils;
+
+#[cfg(test)]
+mod test_utils;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about = "Sanctum SPL Stake Pool CLI")]
