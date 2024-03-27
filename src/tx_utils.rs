@@ -6,7 +6,7 @@ use solana_client::{
     rpc_response::RpcSimulateTransactionResult,
 };
 use solana_sdk::{
-    address_lookup_table::{state::AddressLookupTable, AddressLookupTableAccount},
+    address_lookup_table::AddressLookupTableAccount,
     compute_budget::ComputeBudgetInstruction,
     hash::Hash,
     instruction::Instruction,
@@ -17,8 +17,6 @@ use solana_sdk::{
     signers::Signers,
     transaction::VersionedTransaction,
 };
-
-use crate::consts::srlut;
 
 const CU_BUFFER_RATIO: f64 = 1.15;
 
@@ -45,7 +43,6 @@ pub async fn with_auto_cb_ixs(
                 encoding: None,
                 accounts: None,
                 min_context_slot: None,
-                inner_instructions: true,
             },
         )
         .await
@@ -70,7 +67,7 @@ pub async fn handle_tx_full(
     send_mode: TxSendMode,
     ixs: &[Instruction],
     luts: &[AddressLookupTableAccount],
-    mut signers: Vec<&dyn Signer>,
+    signers: &mut [&dyn Signer],
 ) {
     let payer_pk = signers[0].pubkey();
     signers.sort_by_key(|s| s.pubkey());
@@ -78,7 +75,7 @@ pub async fn handle_tx_full(
     rpc.handle_tx(
         &VersionedTransaction::try_new(
             VersionedMessage::V0(Message::try_compile(&payer_pk, ixs, luts, rbh).unwrap()),
-            &SortedSigners(&signers),
+            &SortedSigners(signers),
         )
         .unwrap(),
         send_mode,
@@ -145,6 +142,7 @@ impl<'slice, 'signer> Signers for SortedSigners<'slice, 'signer> {
     }
 }
 
+/*
 pub async fn fetch_srlut(rpc: &RpcClient) -> AddressLookupTableAccount {
     let srlut = rpc.get_account(&srlut::ID).await.unwrap();
     AddressLookupTableAccount {
@@ -155,3 +153,4 @@ pub async fn fetch_srlut(rpc: &RpcClient) -> AddressLookupTableAccount {
             .into(),
     }
 }
+ */

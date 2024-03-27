@@ -14,7 +14,7 @@ use crate::{
     consts::ZERO_FEE,
     pool_config::{ConfigFileRaw, CreateConfig},
     subcmd::Subcmd,
-    tx_utils::{fetch_srlut, handle_tx_full, with_auto_cb_ixs},
+    tx_utils::{handle_tx_full, with_auto_cb_ixs},
 };
 
 #[derive(Args, Debug)]
@@ -156,31 +156,21 @@ impl CreatePoolArgs {
             args.send_mode,
             &first_ixs,
             &[],
-            Vec::from(cc.create_reserve_tx_signers_maybe_dup()),
+            &mut cc.create_reserve_tx_signers_maybe_dup(),
         )
         .await;
 
         let ixs = Vec::from(cc.initialize_tx_ixs().unwrap());
-        let srlut = fetch_srlut(&rpc).await;
         let ixs = match args.send_mode {
             TxSendMode::DumpMsg => ixs,
-            _ => {
-                with_auto_cb_ixs(
-                    &rpc,
-                    &payer.pubkey(),
-                    ixs,
-                    &[srlut.clone()], // this clone is wholly unnecessary, god i hate solana-sdk
-                    args.fee_limit_cu,
-                )
-                .await
-            }
+            _ => with_auto_cb_ixs(&rpc, &payer.pubkey(), ixs, &[], args.fee_limit_cu).await,
         };
         handle_tx_full(
             &rpc,
             args.send_mode,
             &ixs,
-            &[srlut],
-            Vec::from(cc.initialize_tx_signers_maybe_dup()),
+            &[],
+            &mut cc.initialize_tx_signers_maybe_dup(),
         )
         .await;
     }
@@ -197,9 +187,12 @@ fn verify_mint(mint: &Account, manager_pk: &Pubkey) -> Result<(), Box<dyn Error>
     if mint.supply > 0 {
         return Err("Mint has nonzero supply".into());
     }
-    if let COption::Some(mint_auth) = mint.mint_authority {
-        if mint_auth != *manager_pk {
-            return Err("Mint authority not set to manager".into());
+    match mint.mint_authority {
+        COption::None => return Err("Mint has no mint authority".into()),
+        COption::Some(mint_auth) => {
+            if mint_auth != *manager_pk {
+                return Err("Mint authority not set to manager".into());
+            }
         }
     }
     // TODO: verify acceptable extensions

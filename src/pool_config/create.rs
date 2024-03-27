@@ -1,10 +1,10 @@
+use borsh::BorshSerialize;
 use sanctum_spl_stake_pool_lib::{
     account_resolvers::{Initialize, InitializeWithDepositAuthArgs},
     FindWithdrawAuthority,
 };
 use solana_readonly_account::{keyed::Keyed, ReadonlyAccountData, ReadonlyAccountOwner};
 use solana_sdk::{
-    borsh1::get_instance_packed_len,
     instruction::Instruction,
     pubkey::Pubkey,
     rent::Rent,
@@ -121,7 +121,7 @@ impl<'a, T: ReadonlyAccountOwner + ReadonlyAccountData> CreateConfig<'a, T> {
                 self.max_validators.try_into().unwrap()
             ],
         };
-        let validator_list_size = get_instance_packed_len(&dummy_validator_list)?;
+        let validator_list_size = dummy_validator_list.try_to_vec()?.len();
         let create_validator_list_ix = system_instruction::create_account(
             &self.payer.pubkey(),
             &self.validator_list.pubkey(),
@@ -346,13 +346,10 @@ impl<'a, T: ReadonlyAccountOwner + ReadonlyAccountData> CreateConfig<'a, T> {
 mod tests {
     use sanctum_associated_token_lib::FindAtaAddressArgs;
     use sanctum_solana_test_utils::{
-        test_fixtures_dir,
         token::{tokenkeg::mock_tokenkeg_mint, MockMintArgs},
-        IntoAccount, KeyedUiAccount,
+        IntoAccount,
     };
-    use solana_readonly_account::ReadonlyAccountData;
     use solana_sdk::{
-        address_lookup_table::{state::AddressLookupTable, AddressLookupTableAccount},
         compute_budget::ComputeBudgetInstruction,
         hash::Hash,
         message::{v0::Message, VersionedMessage},
@@ -425,7 +422,9 @@ mod tests {
         ];
         ixs.extend(config.initialize_tx_ixs().unwrap());
 
-        // compute budget instructions make it go to 1251 without use of srlut
+        /*
+        // compute budget instructions make it go to 1251 without use of srlut,
+        // not anymore now that we separate create reserve out
         let srlut =
             KeyedUiAccount::from_file(test_fixtures_dir().join("srlut.json")).to_keyed_account();
         let srlut = AddressLookupTableAccount {
@@ -435,11 +434,12 @@ mod tests {
                 .addresses
                 .into(),
         };
+         */
 
         let tx = VersionedTransaction {
             signatures: vec![Signature::default(); 4],
             message: VersionedMessage::V0(
-                Message::try_compile(&payer.pubkey(), &ixs, &[srlut], Hash::default()).unwrap(),
+                Message::try_compile(&payer.pubkey(), &ixs, &[], Hash::default()).unwrap(),
             ),
         };
 

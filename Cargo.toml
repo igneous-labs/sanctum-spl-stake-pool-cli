@@ -9,7 +9,7 @@ path = "src/main.rs"
 
 [dependencies]
 bincode = "^1"
-borsh = "^1"
+borsh = "^0.10"
 clap = { version = "^4", features = ["derive"] }
 sanctum-macros = "^1"
 serde = { version = "^1", features = ["derive"] }
@@ -27,12 +27,17 @@ sanctum-solana-cli-utils = { features = ["clap"], git = "https://github.com/igne
 sanctum-spl-stake-pool-lib = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "067c802" }
 
 # solana
-solana-account-decoder = "^1.18" # need to explicitly specify or cargo pulls 1.5 for some goddamn reason
-solana-client = "^1.18" # need to explicitly specify or cargo pulls 1.5 for some goddamn reason
-solana-program = "^1.18"
-solana-sdk = "^1.18"
-solana-transaction-status = "^1.18" # need to explicitly specify or cargo pulls 1.5 for some goddamn reason
+# keeping to 1.17.6 for now because later versions have some shit with the LoadedPrograms cache not loading
+# programs that were added from account files properly
+solana-account-decoder = "~1.17" # need to explicitly specify or cargo pulls 1.5 for some goddamn reason
+solana-client = "~1.17" # need to explicitly specify or cargo pulls 1.5 for some goddamn reason
+solana-program = "=1.17.6"
+solana-sdk = "~1.17"
+solana-transaction-status = "~1.17" # need to explicitly specify or cargo pulls 1.5 for some goddamn reason
 
 [dev-dependencies]
-sanctum-solana-test-utils = { features = ["token"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "067c802" }
+assert_cmd = "^1"
+data-encoding = "^2"
+sanctum-solana-test-utils = { features = ["banks-rpc-server", "cli", "token"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "067c802" }
+solana-program-test = "~1.17"
 spl-token = "^4"
