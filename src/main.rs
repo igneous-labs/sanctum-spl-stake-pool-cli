@@ -10,7 +10,6 @@ use subcmd::Subcmd;
 use tokio::runtime::Runtime;
 
 mod consts;
-mod parse;
 mod pool_config;
 mod subcmd;
 mod tx_utils;

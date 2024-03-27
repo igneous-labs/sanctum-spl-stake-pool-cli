@@ -20,6 +20,7 @@ toml = "^0.8" # borsh-derive 0.9 -> proc-macro-crate 0.1.5 -> toml ^0.5, but 0.5
 # sanctum-solana-utils
 spl_associated_token_account_interface = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "067c802" }
 spl_stake_pool_interface = { features = ["serde"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "067c802" }
+spl_token_interface = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "067c802" }
 sanctum-associated-token-lib = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "067c802" }
 sanctum-solana-cli-utils = { features = ["clap"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "067c802" }
 sanctum-spl-stake-pool-lib = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "067c802" }

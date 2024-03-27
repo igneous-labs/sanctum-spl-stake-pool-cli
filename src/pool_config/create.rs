@@ -2,9 +2,8 @@ use sanctum_spl_stake_pool_lib::{
     account_resolvers::{Initialize, InitializeWithDepositAuthArgs},
     FindWithdrawAuthority,
 };
-use solana_readonly_account::keyed::Keyed;
+use solana_readonly_account::{keyed::Keyed, ReadonlyAccountData, ReadonlyAccountOwner};
 use solana_sdk::{
-    account::Account,
     borsh1::get_instance_packed_len,
     instruction::Instruction,
     pubkey::Pubkey,
@@ -20,6 +19,9 @@ use spl_stake_pool_interface::{
     initialize_ix_with_program_id, AccountType, Fee, InitializeIxArgs, StakeStatus, ValidatorList,
     ValidatorListHeader, ValidatorStakeInfo,
 };
+use spl_token_interface::{
+    set_authority_ix_with_program_id, AuthorityType, SetAuthorityIxArgs, SetAuthorityKeys,
+};
 
 // TODO: stake pool program may change parameters
 const MIN_RESERVE_BALANCE: u64 = 0;
@@ -31,8 +33,8 @@ const STAKE_POOL_SIZE: usize = 611;
 const STAKE_STATE_LEN: u64 = 200;
 
 #[derive(Debug)]
-pub struct CreateConfig<'a> {
-    pub mint: Keyed<Account>,
+pub struct CreateConfig<'a, T> {
+    pub mint: Keyed<T>,
     pub program_id: Pubkey,
     pub payer: &'a (dyn Signer + 'static),
     pub pool: &'a (dyn Signer + 'static),
@@ -50,19 +52,9 @@ pub struct CreateConfig<'a> {
     pub rent: Rent,
 }
 
-impl<'a> CreateConfig<'a> {
-    pub fn initialize_tx_signers_maybe_dup(&self) -> [&'a dyn Signer; 5] {
-        [
-            self.payer,
-            self.pool,
-            self.validator_list,
-            self.reserve,
-            self.manager,
-        ]
-    }
-
-    // Worst case transaction size is 1251 with 2x computebudget instructions (over limit)
-    pub fn initialize_tx_ixs(&self) -> std::io::Result<[Instruction; 5]> {
+impl<'a, T: ReadonlyAccountOwner + ReadonlyAccountData> CreateConfig<'a, T> {
+    // split from initialize_tx due to tx size limits
+    pub fn create_reserve_tx_ixs(&self) -> std::io::Result<[Instruction; 2]> {
         let create_reserve_ix = system_instruction::create_account(
             &self.payer.pubkey(),
             &self.reserve.pubkey(),
@@ -82,6 +74,34 @@ impl<'a> CreateConfig<'a> {
             &Authorized::auto(&pool_withdraw_auth),
             &Lockup::default(),
         );
+        Ok([create_reserve_ix, init_reserve_ix])
+    }
+
+    pub fn create_reserve_tx_signers_maybe_dup(&self) -> [&'a dyn Signer; 2] {
+        [self.payer, self.reserve]
+    }
+
+    pub fn initialize_tx_signers_maybe_dup(&self) -> [&'a dyn Signer; 4] {
+        [self.payer, self.pool, self.validator_list, self.manager]
+    }
+
+    // Worst case transaction size is 1251 with 2x computebudget instructions (over limit)
+    pub fn initialize_tx_ixs(&self) -> std::io::Result<[Instruction; 4]> {
+        let (pool_withdraw_auth, _bump) = FindWithdrawAuthority {
+            pool: self.pool.pubkey(),
+        }
+        .run_for_prog(&self.program_id);
+        let transfer_mint_auth_ix = set_authority_ix_with_program_id(
+            *self.mint.owner(),
+            SetAuthorityKeys {
+                account: self.mint.pubkey,
+                authority: self.manager.pubkey(),
+            },
+            SetAuthorityIxArgs {
+                authority_type: AuthorityType::MintTokens,
+                new_authority: Some(pool_withdraw_auth),
+            },
+        )?;
         let dummy_validator_list = ValidatorList {
             header: ValidatorListHeader {
                 account_type: AccountType::ValidatorList,
@@ -149,8 +169,7 @@ impl<'a> CreateConfig<'a> {
             ));
         }
         Ok([
-            create_reserve_ix,
-            init_reserve_ix,
+            transfer_mint_auth_ix,
             create_validator_list_ix,
             create_pool_ix,
             init_ix,
@@ -349,13 +368,13 @@ mod tests {
 
     #[test]
     fn create_ixs_tx_size_limit() {
-        const N_SIGNERS_WORST_CASE: usize = 5;
+        const N_SIGNERS: usize = 5;
 
-        let keys: Vec<Box<dyn Signer>> = (0..N_SIGNERS_WORST_CASE)
+        let keys: Vec<Box<dyn Signer>> = (0..N_SIGNERS)
             .map(|_| Box::new(Keypair::new()).into())
             .collect();
-        let [payer, pool, validator_list, reserve, manager]: &[Box<dyn Signer>;
-             N_SIGNERS_WORST_CASE] = keys.as_slice().try_into().unwrap();
+        let [payer, pool, validator_list, reserve, manager]: &[Box<dyn Signer>; N_SIGNERS] =
+            keys.as_slice().try_into().unwrap();
         let mint_account = mock_tokenkeg_mint(MockMintArgs {
             mint_authority: Some(Pubkey::new_unique()),
             freeze_authority: None,
@@ -418,7 +437,7 @@ mod tests {
         };
 
         let tx = VersionedTransaction {
-            signatures: vec![Signature::default(); N_SIGNERS_WORST_CASE],
+            signatures: vec![Signature::default(); 4],
             message: VersionedMessage::V0(
                 Message::try_compile(&payer.pubkey(), &ixs, &[srlut], Hash::default()).unwrap(),
             ),

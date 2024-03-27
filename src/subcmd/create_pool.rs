@@ -4,13 +4,14 @@ use clap::Args;
 use sanctum_associated_token_lib::FindAtaAddressArgs;
 use sanctum_solana_cli_utils::{parse_signer, TxSendMode};
 use solana_readonly_account::keyed::Keyed;
-use solana_sdk::{account::Account, pubkey::Pubkey, rent::Rent, system_program, sysvar};
+use solana_sdk::{
+    account::Account, program_option::COption, pubkey::Pubkey, rent::Rent, system_program, sysvar,
+};
 use spl_associated_token_account_interface::CreateIdempotentKeys;
 use spl_token_2022::{extension::StateWithExtensions, state::Mint};
 
 use crate::{
     consts::ZERO_FEE,
-    parse::parse_signer_or_rando_kp,
     pool_config::{ConfigFileRaw, CreateConfig},
     subcmd::Subcmd,
     tx_utils::{fetch_srlut, handle_tx_full, with_auto_cb_ixs},
@@ -62,7 +63,7 @@ impl CreatePoolArgs {
 
         let [pool, validator_list, reserve] =
             [pool.as_ref(), validator_list.as_ref(), reserve.as_ref()]
-                .map(parse_signer_or_rando_kp);
+                .map(|p| parse_signer(p.unwrap()).unwrap());
         let manager = manager.map(|m| parse_signer(&m).unwrap());
         let manager = manager
             .as_ref()
@@ -80,7 +81,7 @@ impl CreatePoolArgs {
         let rent: Rent = bincode::deserialize(&rent.data).unwrap();
 
         let mint_acc = mint_acc.expect("Mint not initialized");
-        verify_mint(&mint_acc).unwrap();
+        verify_mint(&mint_acc, &manager.pubkey()).unwrap();
 
         let manager_fee_ata = FindAtaAddressArgs {
             wallet: manager.pubkey(),
@@ -98,51 +99,11 @@ impl CreatePoolArgs {
             .unwrap()
             .pop()
             .unwrap();
-        if manager_fee_fetched.is_none() {
-            if manager_fee_account != manager_fee_ata {
-                panic!("Manager fee account does not exist and is not ATA");
-            }
-            eprintln!("Creating manager fee account {manager_fee_account}");
-            let create_ata_ixs = vec![
-                spl_associated_token_account_interface::create_idempotent_ix(
-                    CreateIdempotentKeys {
-                        funding_account: payer.pubkey(),
-                        associated_token_account: manager_fee_account,
-                        wallet: manager.pubkey(),
-                        mint,
-                        system_program: system_program::ID,
-                        token_program: mint_acc.owner,
-                    },
-                )
-                .unwrap(),
-            ];
-            let create_ata_ixs = match args.send_mode {
-                TxSendMode::DumpMsg => create_ata_ixs,
-                _ => {
-                    with_auto_cb_ixs(
-                        &rpc,
-                        &payer.pubkey(),
-                        create_ata_ixs,
-                        &[],
-                        args.fee_limit_cu,
-                    )
-                    .await
-                }
-            };
-            handle_tx_full(
-                &rpc,
-                args.send_mode,
-                &create_ata_ixs,
-                &[],
-                vec![payer.as_ref()],
-            )
-            .await;
-        }
 
         let cc = CreateConfig {
             mint: Keyed {
                 pubkey: mint,
-                account: mint_acc,
+                account: &mint_acc,
             },
             program_id: args.program,
             payer: payer.as_ref(),
@@ -164,6 +125,41 @@ impl CreatePoolArgs {
             max_validators: max_validators.unwrap(),
             rent,
         };
+
+        let mut first_ixs = Vec::from(cc.create_reserve_tx_ixs().unwrap());
+
+        if manager_fee_fetched.is_none() {
+            if manager_fee_account != manager_fee_ata {
+                panic!("Manager fee account does not exist and is not ATA");
+            }
+            eprintln!("Creating manager fee account {manager_fee_account}");
+            first_ixs.push(
+                spl_associated_token_account_interface::create_idempotent_ix(
+                    CreateIdempotentKeys {
+                        funding_account: payer.pubkey(),
+                        associated_token_account: manager_fee_account,
+                        wallet: manager.pubkey(),
+                        mint,
+                        system_program: system_program::ID,
+                        token_program: mint_acc.owner,
+                    },
+                )
+                .unwrap(),
+            );
+        }
+        let first_ixs = match args.send_mode {
+            TxSendMode::DumpMsg => first_ixs,
+            _ => with_auto_cb_ixs(&rpc, &payer.pubkey(), first_ixs, &[], args.fee_limit_cu).await,
+        };
+        handle_tx_full(
+            &rpc,
+            args.send_mode,
+            &first_ixs,
+            &[],
+            Vec::from(cc.create_reserve_tx_signers_maybe_dup()),
+        )
+        .await;
+
         let ixs = Vec::from(cc.initialize_tx_ixs().unwrap());
         let srlut = fetch_srlut(&rpc).await;
         let ixs = match args.send_mode {
@@ -190,7 +186,7 @@ impl CreatePoolArgs {
     }
 }
 
-fn verify_mint(mint: &Account) -> Result<(), Box<dyn Error>> {
+fn verify_mint(mint: &Account, manager_pk: &Pubkey) -> Result<(), Box<dyn Error>> {
     let StateWithExtensions { base: mint, .. } = StateWithExtensions::<Mint>::unpack(&mint.data)?;
     if mint.decimals != 9 {
         return Err("Mint not of 9 decimals".into());
@@ -200,6 +196,11 @@ fn verify_mint(mint: &Account) -> Result<(), Box<dyn Error>> {
     }
     if mint.supply > 0 {
         return Err("Mint has nonzero supply".into());
+    }
+    if let COption::Some(mint_auth) = mint.mint_authority {
+        if mint_auth != *manager_pk {
+            return Err("Mint authority not set to manager".into());
+        }
     }
     // TODO: verify acceptable extensions
     Ok(())
