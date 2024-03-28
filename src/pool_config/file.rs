@@ -119,7 +119,7 @@ mod tests {
         let example_path = test_fixtures_dir().join("example-init-pool-config.toml");
         let res = ConfigFileRaw::read_from_path(example_path).unwrap();
         // sample some fields
-        assert_eq!(res.max_validators, Some(10));
+        assert_eq!(res.max_validators, Some(2));
         assert_eq!(
             res.epoch_fee,
             Some(Fee {

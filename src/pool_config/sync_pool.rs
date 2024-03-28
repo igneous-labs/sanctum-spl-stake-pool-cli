@@ -13,7 +13,7 @@ use crate::utils::filter_default_stake_deposit_auth;
 
 /// All generated ixs must be signed by manager only
 #[derive(Debug)]
-pub struct SyncPoolManagerConfig<'a> {
+pub struct SyncPoolConfig<'a> {
     pub program_id: Pubkey,
     pub pool: Pubkey,
     pub payer: &'a (dyn Signer + 'static),
@@ -136,7 +136,7 @@ impl SyncPoolManagerChange {
     }
 }
 
-impl<'a> SyncPoolManagerConfig<'a> {
+impl<'a> SyncPoolConfig<'a> {
     pub fn signers_maybe_dup(&self) -> [&'a dyn Signer; 3] {
         [self.payer, self.manager, self.new_manager]
     }

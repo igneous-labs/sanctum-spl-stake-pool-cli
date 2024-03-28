@@ -13,7 +13,7 @@ use spl_stake_pool_interface::{AccountType, Fee, FutureEpochFee, Lockup, StakePo
 use spl_token_2022::{extension::StateWithExtensions, state::Mint};
 
 use crate::{
-    pool_config::{ConfigFileRaw, CreateConfig, SyncPoolManagerConfig, SyncValidatorListConfig},
+    pool_config::{ConfigFileRaw, CreateConfig, SyncPoolConfig, SyncValidatorListConfig},
     subcmd::Subcmd,
     tx_utils::{handle_tx_full, with_auto_cb_ixs, MAX_ADD_VALIDATORS_IX_PER_TX},
     utils::filter_default_stake_deposit_auth,
@@ -259,7 +259,7 @@ impl CreatePoolArgs {
             last_epoch_pool_token_supply: 0,
             last_epoch_total_lamports: 0,
         };
-        let spmc = SyncPoolManagerConfig {
+        let spmc = SyncPoolConfig {
             program_id: args.program,
             pool: cc.pool.pubkey(),
             payer: cc.payer,

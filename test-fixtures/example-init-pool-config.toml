@@ -11,8 +11,8 @@ manager = "./test-fixtures/example-manager-keypair.json" # defaults to config wa
 # staker = "DAgQZufbVTGvJkDd3FhtcLPcmWXX7h5jzcePyVKCWZoL" # defaults to manager if not specified
 
 # stake-deposit-auth = "DAgQZufbVTGvJkDd3FhtcLPcmWXX7h5jzcePyVKCWZoL" # defaults to None if not specified
-sol-deposit-auth = "DAgQZufbVTGvJkDd3FhtcLPcmWXX7h5jzcePyVKCWZoL" # defaults to None if not specified
-sol-withdraw-auth = "DAgQZufbVTGvJkDd3FhtcLPcmWXX7h5jzcePyVKCWZoL" # defaults to None if not specified
+sol-deposit-auth = "DUMMYSo1DEPoS1TAUTH1111111111111111111111111" # defaults to None if not specified
+sol-withdraw-auth = "DUMMYSo1W1THDRAWAUTH11111111111111111111111" # defaults to None if not specified
 
 # preferred-deposit-validator = "BLADE1qNA1uNjRgER6DtUFf7FU3c1TWLLdpPeEcKatZ2" # defaults to None if not specified
 # preferred-withdraw-validator = "FnAPJkzf19s87sm24Qhv6bHZMZvZ43gjNUBRgjwXpD4v" # defaults to None if not specified

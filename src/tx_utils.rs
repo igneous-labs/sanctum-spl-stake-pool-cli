@@ -132,7 +132,7 @@ mod tests {
                 ),
             };
             let tx_len = bincode::serialize(&tx).unwrap().len();
-            // println!("{tx_len}"); // 1231 (WEW)
+            // println!("{tx_len}"); // 1231 WEW
             assert!(tx_len < TX_SIZE_LIMIT);
         }
     }
