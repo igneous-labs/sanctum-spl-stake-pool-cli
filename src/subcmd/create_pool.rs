@@ -3,17 +3,16 @@ use std::{error::Error, path::PathBuf, str::FromStr};
 use clap::Args;
 use sanctum_associated_token_lib::FindAtaAddressArgs;
 use sanctum_solana_cli_utils::{parse_pubkey_src, parse_signer, TxSendMode};
-use sanctum_spl_stake_pool_lib::FindDepositAuthority;
+use sanctum_spl_stake_pool_lib::{FindDepositAuthority, ZERO_FEE};
 use solana_readonly_account::{keyed::Keyed, ReadonlyAccountOwner};
 use solana_sdk::{
     account::Account, program_option::COption, pubkey::Pubkey, rent::Rent, system_program, sysvar,
 };
 use spl_associated_token_account_interface::CreateIdempotentKeys;
-use spl_stake_pool_interface::{AccountType, FutureEpochFee, Lockup, StakePool};
+use spl_stake_pool_interface::{AccountType, Fee, FutureEpochFee, Lockup, StakePool};
 use spl_token_2022::{extension::StateWithExtensions, state::Mint};
 
 use crate::{
-    consts::ZERO_FEE,
     pool_config::{ConfigFileRaw, CreateConfig, SyncPoolManagerConfig},
     subcmd::Subcmd,
     tx_utils::{handle_tx_full, with_auto_cb_ixs},
@@ -53,12 +52,14 @@ impl CreatePoolArgs {
             sol_deposit_fee,
             sol_deposit_auth,
             sol_withdraw_auth,
+            validators,
             ..
         } = ConfigFileRaw::read_from_path(pool_config).unwrap();
 
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();
 
+        // preprocess fields
         let [pool, validator_list, reserve] =
             [pool.as_ref(), validator_list.as_ref(), reserve.as_ref()]
                 .map(|p| parse_signer(p.unwrap()).unwrap());
@@ -68,6 +69,8 @@ impl CreatePoolArgs {
             .map(|m| m.as_ref())
             .unwrap_or(payer.as_ref());
         let mint = Pubkey::from_str(&mint.unwrap()).unwrap();
+        let validators = validators.unwrap_or(Vec::new());
+        let starting_validators = validators.len();
 
         let mut fetched = rpc
             .get_multiple_accounts(&[sysvar::rent::ID, mint])
@@ -103,6 +106,36 @@ impl CreatePoolArgs {
         }
         .run_for_prog(&args.program);
 
+        // initialize sets sol/stake fee to the same number
+        // use the higher value of the two to avoid per-epoch max withdrawal fee increase limits
+        let epoch_fee = epoch_fee.unwrap_or(ZERO_FEE);
+        let stake_deposit_referral_fee = stake_deposit_referral_fee.unwrap_or(0);
+        let sol_deposit_referral_fee = sol_deposit_referral_fee.unwrap_or(0);
+        let deposit_referral_fee = if stake_deposit_referral_fee > sol_deposit_referral_fee {
+            stake_deposit_referral_fee
+        } else {
+            sol_deposit_referral_fee
+        };
+        let stake_deposit_fee = stake_deposit_fee.unwrap_or(ZERO_FEE);
+        let sol_deposit_fee = sol_deposit_fee.unwrap_or(ZERO_FEE);
+        let deposit_fee = select_higher_fee(&stake_deposit_fee, &sol_deposit_fee);
+        let stake_withdrawal_fee = stake_withdrawal_fee.unwrap_or(ZERO_FEE);
+        let sol_withdrawal_fee = sol_withdrawal_fee.unwrap_or(ZERO_FEE);
+        let withdrawal_fee = select_higher_fee(&stake_withdrawal_fee, &sol_withdrawal_fee);
+        let staker = staker.map_or_else(|| manager.pubkey(), |s| Pubkey::from_str(&s).unwrap());
+        let stake_deposit_auth = stake_deposit_auth.map_or_else(
+            || None,
+            |s| {
+                filter_default_stake_deposit_auth(
+                    Pubkey::from_str(&s).unwrap(),
+                    &default_stake_deposit_auth,
+                )
+            },
+        );
+        let sol_deposit_auth = sol_deposit_auth.map(|s| parse_pubkey_src(&s).unwrap().pubkey());
+        let sol_withdraw_auth = sol_withdraw_auth.map(|s| parse_pubkey_src(&s).unwrap().pubkey());
+        let max_validators = max_validators.unwrap();
+
         let cc = CreateConfig {
             mint: Keyed {
                 pubkey: mint,
@@ -115,28 +148,15 @@ impl CreatePoolArgs {
             reserve: reserve.as_ref(),
             manager,
             manager_fee_account,
-            staker: staker.map_or_else(|| manager.pubkey(), |s| Pubkey::from_str(&s).unwrap()),
-            deposit_auth: stake_deposit_auth.map_or_else(
-                || None,
-                |s| {
-                    filter_default_stake_deposit_auth(
-                        Pubkey::from_str(&s).unwrap(),
-                        &default_stake_deposit_auth,
-                    )
-                },
-            ),
-            deposit_referral_fee: stake_deposit_referral_fee
-                .or(sol_deposit_referral_fee)
-                .unwrap_or_default(),
-            epoch_fee: epoch_fee.unwrap_or(ZERO_FEE),
-            withdrawal_fee: stake_withdrawal_fee
-                .or(sol_withdrawal_fee.clone())
-                .unwrap_or(ZERO_FEE),
-            deposit_fee: stake_deposit_fee
-                .or(sol_deposit_fee.clone())
-                .unwrap_or(ZERO_FEE),
-            max_validators: max_validators.unwrap(),
+            staker,
+            deposit_auth: stake_deposit_auth,
+            deposit_referral_fee,
+            epoch_fee: epoch_fee.clone(),
+            withdrawal_fee,
+            deposit_fee,
+            max_validators,
             rent,
+            starting_validators,
         };
 
         let mut first_ixs = Vec::from(cc.create_reserve_tx_ixs().unwrap());
@@ -199,7 +219,7 @@ impl CreatePoolArgs {
             account_type: AccountType::StakePool,
             manager: cc.manager.pubkey(),
             staker: cc.staker,
-            stake_deposit_authority: cc.deposit_auth.unwrap_or(default_stake_deposit_auth),
+            stake_deposit_authority: stake_deposit_auth.unwrap_or(default_stake_deposit_auth),
             validator_list: cc.validator_list.pubkey(),
             reserve_stake: cc.reserve.pubkey(),
             pool_mint: cc.mint.pubkey,
@@ -238,18 +258,18 @@ impl CreatePoolArgs {
             payer: cc.payer,
             manager,
             new_manager: manager,
-            staker: cc.staker,
+            staker,
             manager_fee_account,
-            sol_deposit_auth: sol_deposit_auth.map(|s| parse_pubkey_src(&s).unwrap().pubkey()),
-            stake_deposit_auth: cc.deposit_auth,
-            sol_withdraw_auth: sol_withdraw_auth.map(|s| parse_pubkey_src(&s).unwrap().pubkey()),
-            epoch_fee: cc.epoch_fee,
-            stake_deposit_referral_fee: cc.deposit_referral_fee,
-            sol_deposit_referral_fee: sol_deposit_referral_fee.unwrap_or(0),
-            stake_withdrawal_fee: cc.withdrawal_fee,
-            sol_withdrawal_fee: sol_withdrawal_fee.unwrap_or(ZERO_FEE),
-            stake_deposit_fee: cc.deposit_fee,
-            sol_deposit_fee: sol_deposit_fee.unwrap_or(ZERO_FEE),
+            sol_deposit_auth,
+            stake_deposit_auth,
+            sol_withdraw_auth,
+            epoch_fee,
+            stake_deposit_referral_fee,
+            sol_deposit_referral_fee,
+            stake_withdrawal_fee,
+            sol_withdrawal_fee,
+            stake_deposit_fee,
+            sol_deposit_fee,
         };
 
         let changeset = spmc.changeset(&created_dummy);
@@ -295,4 +315,20 @@ fn verify_mint(mint: &Account, manager_pk: &Pubkey) -> Result<(), Box<dyn Error>
     }
     // TODO: verify acceptable extensions
     Ok(())
+}
+
+fn select_higher_fee(s1: &Fee, s2: &Fee) -> Fee {
+    if s1.numerator == 0 || s1.denominator == 0 {
+        return s2.clone();
+    }
+    if s2.numerator == 0 || s2.denominator == 0 {
+        return s1.clone();
+    }
+    let s1_cmp = s1.numerator.saturating_mul(s2.denominator);
+    let s2_cmp = s2.numerator.saturating_mul(s1.denominator);
+    if s1_cmp > s2_cmp {
+        s1.clone()
+    } else {
+        s2.clone()
+    }
 }

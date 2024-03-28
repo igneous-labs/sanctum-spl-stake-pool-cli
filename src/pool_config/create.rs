@@ -1,7 +1,7 @@
 use borsh::BorshSerialize;
 use sanctum_spl_stake_pool_lib::{
     account_resolvers::{Initialize, InitializeWithDepositAuthArgs},
-    FindWithdrawAuthority,
+    lamports_for_new_vsa, min_reserve_lamports, FindWithdrawAuthority, STAKE_POOL_SIZE,
 };
 use solana_readonly_account::{keyed::Keyed, ReadonlyAccountData, ReadonlyAccountOwner};
 use solana_sdk::{
@@ -11,7 +11,7 @@ use solana_sdk::{
     signer::Signer,
     stake::{
         self,
-        state::{Authorized, Lockup},
+        state::{Authorized, Lockup, StakeStateV2},
     },
     system_instruction,
 };
@@ -22,15 +22,6 @@ use spl_stake_pool_interface::{
 use spl_token_interface::{
     set_authority_ix_with_program_id, AuthorityType, SetAuthorityIxArgs, SetAuthorityKeys,
 };
-
-// TODO: stake pool program may change parameters
-const MIN_RESERVE_BALANCE: u64 = 0;
-
-// TODO: stake pool program may change parameters
-const STAKE_POOL_SIZE: usize = 611;
-
-// TODO: stake program may change parameters
-const STAKE_STATE_LEN: u64 = 200;
 
 #[derive(Debug)]
 pub struct CreateConfig<'a, T> {
@@ -49,6 +40,7 @@ pub struct CreateConfig<'a, T> {
     pub withdrawal_fee: Fee,
     pub deposit_fee: Fee,
     pub max_validators: u32,
+    pub starting_validators: usize,
     pub rent: Rent,
 }
 
@@ -58,11 +50,12 @@ impl<'a, T: ReadonlyAccountOwner + ReadonlyAccountData> CreateConfig<'a, T> {
         let create_reserve_ix = system_instruction::create_account(
             &self.payer.pubkey(),
             &self.reserve.pubkey(),
-            MIN_RESERVE_BALANCE
-                + self
-                    .rent
-                    .minimum_balance(STAKE_STATE_LEN.try_into().unwrap()),
-            STAKE_STATE_LEN,
+            min_reserve_lamports(&self.rent).saturating_add(
+                u64::try_from(self.starting_validators)
+                    .unwrap()
+                    .saturating_mul(lamports_for_new_vsa(&self.rent)),
+            ),
+            std::mem::size_of::<StakeStateV2>().try_into().unwrap(),
             &stake::program::ID,
         );
         let (pool_withdraw_auth, _bump) = FindWithdrawAuthority {
@@ -249,6 +242,7 @@ mod tests {
                 numerator: 9,
             },
             max_validators: 13,
+            starting_validators: 1,
             rent: Rent::default(),
         };
         let mut ixs = vec![
