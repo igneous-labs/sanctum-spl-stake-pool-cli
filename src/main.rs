@@ -13,6 +13,7 @@ mod consts;
 mod pool_config;
 mod subcmd;
 mod tx_utils;
+mod utils;
 
 #[cfg(test)]
 mod test_utils;

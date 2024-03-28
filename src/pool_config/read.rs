@@ -53,7 +53,7 @@ impl ConfigFileRaw {
         self.staker = Some(staker.to_string());
         self.sol_deposit_auth = sol_deposit_authority.map(|s| s.to_string());
         let (default_deposit_auth, _bump) = FindDepositAuthority { pool }.run_for_prog(program_id);
-        self.deposit_auth = if *stake_deposit_authority != default_deposit_auth {
+        self.stake_deposit_auth = if *stake_deposit_authority != default_deposit_auth {
             Some(stake_deposit_authority.to_string())
         } else {
             None

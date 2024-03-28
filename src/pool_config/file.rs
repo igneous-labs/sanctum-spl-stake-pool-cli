@@ -18,7 +18,7 @@ pub struct ConfigFileRaw {
     pub manager: Option<String>,
     pub manager_fee_account: Option<String>,
     pub staker: Option<String>,
-    pub deposit_auth: Option<String>,
+    pub stake_deposit_auth: Option<String>,
     pub sol_deposit_auth: Option<String>,
     pub sol_withdraw_auth: Option<String>,
     pub preferred_deposit_validator: Option<String>,

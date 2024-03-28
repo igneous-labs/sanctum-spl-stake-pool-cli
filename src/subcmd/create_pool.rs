@@ -2,19 +2,22 @@ use std::{error::Error, path::PathBuf, str::FromStr};
 
 use clap::Args;
 use sanctum_associated_token_lib::FindAtaAddressArgs;
-use sanctum_solana_cli_utils::{parse_signer, TxSendMode};
-use solana_readonly_account::keyed::Keyed;
+use sanctum_solana_cli_utils::{parse_pubkey_src, parse_signer, TxSendMode};
+use sanctum_spl_stake_pool_lib::FindDepositAuthority;
+use solana_readonly_account::{keyed::Keyed, ReadonlyAccountOwner};
 use solana_sdk::{
     account::Account, program_option::COption, pubkey::Pubkey, rent::Rent, system_program, sysvar,
 };
 use spl_associated_token_account_interface::CreateIdempotentKeys;
+use spl_stake_pool_interface::{AccountType, FutureEpochFee, Lockup, StakePool};
 use spl_token_2022::{extension::StateWithExtensions, state::Mint};
 
 use crate::{
     consts::ZERO_FEE,
-    pool_config::{ConfigFileRaw, CreateConfig},
+    pool_config::{ConfigFileRaw, CreateConfig, SyncPoolManagerConfig},
     subcmd::Subcmd,
     tx_utils::{handle_tx_full, with_auto_cb_ixs},
+    utils::filter_default_stake_deposit_auth,
 };
 
 #[derive(Args, Debug)]
@@ -39,7 +42,7 @@ impl CreatePoolArgs {
             manager,
             manager_fee_account,
             staker,
-            deposit_auth,
+            stake_deposit_auth,
             max_validators,
             stake_deposit_referral_fee,
             sol_deposit_referral_fee,
@@ -48,14 +51,9 @@ impl CreatePoolArgs {
             sol_withdrawal_fee,
             stake_deposit_fee,
             sol_deposit_fee,
-            ..
-            /*
             sol_deposit_auth,
             sol_withdraw_auth,
-            preferred_deposit_validator,
-            preferred_withdraw_validator,
-            validators,
-            */
+            ..
         } = ConfigFileRaw::read_from_path(pool_config).unwrap();
 
         let rpc = args.config.nonblocking_rpc_client();
@@ -100,6 +98,11 @@ impl CreatePoolArgs {
             .pop()
             .unwrap();
 
+        let (default_stake_deposit_auth, _bump) = FindDepositAuthority {
+            pool: pool.pubkey(),
+        }
+        .run_for_prog(&args.program);
+
         let cc = CreateConfig {
             mint: Keyed {
                 pubkey: mint,
@@ -113,15 +116,25 @@ impl CreatePoolArgs {
             manager,
             manager_fee_account,
             staker: staker.map_or_else(|| manager.pubkey(), |s| Pubkey::from_str(&s).unwrap()),
-            deposit_auth: deposit_auth.map(|s| Pubkey::from_str(&s).unwrap()),
+            deposit_auth: stake_deposit_auth.map_or_else(
+                || None,
+                |s| {
+                    filter_default_stake_deposit_auth(
+                        Pubkey::from_str(&s).unwrap(),
+                        &default_stake_deposit_auth,
+                    )
+                },
+            ),
             deposit_referral_fee: stake_deposit_referral_fee
                 .or(sol_deposit_referral_fee)
                 .unwrap_or_default(),
             epoch_fee: epoch_fee.unwrap_or(ZERO_FEE),
             withdrawal_fee: stake_withdrawal_fee
-                .or(sol_withdrawal_fee)
+                .or(sol_withdrawal_fee.clone())
                 .unwrap_or(ZERO_FEE),
-            deposit_fee: stake_deposit_fee.or(sol_deposit_fee).unwrap_or(ZERO_FEE),
+            deposit_fee: stake_deposit_fee
+                .or(sol_deposit_fee.clone())
+                .unwrap_or(ZERO_FEE),
             max_validators: max_validators.unwrap(),
             rent,
         };
@@ -171,6 +184,91 @@ impl CreatePoolArgs {
             &ixs,
             &[],
             &mut cc.initialize_tx_signers_maybe_dup(),
+        )
+        .await;
+
+        // use a dummy instead of fetching the newly created pool from rpc so that it works for --dump-msg
+        //
+        // the sol_*_fees are going to be set to the same value as the
+        // the stake_*_fees during initialization
+        //
+        // sol deposit authority is set to stake deposit authority (last optional account) during initialization
+        //
+        // sol withdraw authority is set to None during initialization
+        let created_dummy = StakePool {
+            account_type: AccountType::StakePool,
+            manager: cc.manager.pubkey(),
+            staker: cc.staker,
+            stake_deposit_authority: cc.deposit_auth.unwrap_or(default_stake_deposit_auth),
+            validator_list: cc.validator_list.pubkey(),
+            reserve_stake: cc.reserve.pubkey(),
+            pool_mint: cc.mint.pubkey,
+            manager_fee_account,
+            token_program_id: *cc.mint.owner(),
+            epoch_fee: cc.epoch_fee.clone(),
+            next_epoch_fee: FutureEpochFee::None,
+            stake_deposit_fee: cc.deposit_fee.clone(),
+            stake_withdrawal_fee: cc.withdrawal_fee.clone(),
+            next_stake_withdrawal_fee: FutureEpochFee::None,
+            stake_referral_fee: cc.deposit_referral_fee,
+            sol_deposit_authority: cc.deposit_auth,
+            sol_deposit_fee: cc.deposit_fee.clone(),
+            sol_referral_fee: cc.deposit_referral_fee,
+            sol_withdraw_authority: None,
+            sol_withdrawal_fee: cc.withdrawal_fee.clone(),
+            next_sol_withdrawal_fee: FutureEpochFee::None,
+            // dont cares:
+            preferred_deposit_validator_vote_address: None,
+            preferred_withdraw_validator_vote_address: None,
+            lockup: Lockup {
+                unix_timestamp: 0,
+                epoch: 0,
+                custodian: Pubkey::default(),
+            },
+            total_lamports: 0,
+            pool_token_supply: 0,
+            last_update_epoch: 0,
+            stake_withdraw_bump_seed: 255,
+            last_epoch_pool_token_supply: 0,
+            last_epoch_total_lamports: 0,
+        };
+        let spmc = SyncPoolManagerConfig {
+            program_id: args.program,
+            pool: cc.pool.pubkey(),
+            payer: cc.payer,
+            manager,
+            new_manager: manager,
+            staker: cc.staker,
+            manager_fee_account,
+            sol_deposit_auth: sol_deposit_auth.map(|s| parse_pubkey_src(&s).unwrap().pubkey()),
+            stake_deposit_auth: cc.deposit_auth,
+            sol_withdraw_auth: sol_withdraw_auth.map(|s| parse_pubkey_src(&s).unwrap().pubkey()),
+            epoch_fee: cc.epoch_fee,
+            stake_deposit_referral_fee: cc.deposit_referral_fee,
+            sol_deposit_referral_fee: sol_deposit_referral_fee.unwrap_or(0),
+            stake_withdrawal_fee: cc.withdrawal_fee,
+            sol_withdrawal_fee: sol_withdrawal_fee.unwrap_or(ZERO_FEE),
+            stake_deposit_fee: cc.deposit_fee,
+            sol_deposit_fee: sol_deposit_fee.unwrap_or(ZERO_FEE),
+        };
+
+        let changeset = spmc.changeset(&created_dummy);
+        for change in changeset.iter() {
+            eprintln!("{change}");
+        }
+        let sync_pool_ixs = spmc.changeset_ixs(&changeset).unwrap();
+        let sync_pool_ixs = match args.send_mode {
+            TxSendMode::DumpMsg => sync_pool_ixs,
+            _ => {
+                with_auto_cb_ixs(&rpc, &payer.pubkey(), sync_pool_ixs, &[], args.fee_limit_cu).await
+            }
+        };
+        handle_tx_full(
+            &rpc,
+            args.send_mode,
+            &sync_pool_ixs,
+            &[],
+            &mut spmc.signers_maybe_dup(),
         )
         .await;
     }

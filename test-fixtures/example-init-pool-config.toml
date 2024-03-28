@@ -10,9 +10,9 @@ manager = "./test-fixtures/example-manager-keypair.json" # defaults to config wa
 # manager-fee-account = "4USVEavVayF32is9pz2oYWn6Vv77rTtMHUhvP5MBgXo2" # defaults to ATA of config wallet if not specified
 # staker = "DAgQZufbVTGvJkDd3FhtcLPcmWXX7h5jzcePyVKCWZoL" # defaults to manager if not specified
 
-# deposit-auth = "DAgQZufbVTGvJkDd3FhtcLPcmWXX7h5jzcePyVKCWZoL" # defaults to None if not specified
-# sol-deposit-auth = "DAgQZufbVTGvJkDd3FhtcLPcmWXX7h5jzcePyVKCWZoL" # defaults to None if not specified
-# sol-withdraw-auth = "DAgQZufbVTGvJkDd3FhtcLPcmWXX7h5jzcePyVKCWZoL" # defaults to None if not specified
+# stake-deposit-auth = "DAgQZufbVTGvJkDd3FhtcLPcmWXX7h5jzcePyVKCWZoL" # defaults to None if not specified
+sol-deposit-auth = "DAgQZufbVTGvJkDd3FhtcLPcmWXX7h5jzcePyVKCWZoL" # defaults to None if not specified
+sol-withdraw-auth = "DAgQZufbVTGvJkDd3FhtcLPcmWXX7h5jzcePyVKCWZoL" # defaults to None if not specified
 
 # preferred-deposit-validator = "BLADE1qNA1uNjRgER6DtUFf7FU3c1TWLLdpPeEcKatZ2" # defaults to None if not specified
 # preferred-withdraw-validator = "FnAPJkzf19s87sm24Qhv6bHZMZvZ43gjNUBRgjwXpD4v" # defaults to None if not specified

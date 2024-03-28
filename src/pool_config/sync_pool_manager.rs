@@ -9,9 +9,11 @@ use spl_stake_pool_interface::{
     SetManagerKeys, SetStakerKeys, StakePool,
 };
 
+use crate::utils::filter_default_stake_deposit_auth;
+
 /// All generated ixs must be signed by manager only
 #[derive(Debug)]
-pub struct SyncPoolConfig<'a> {
+pub struct SyncPoolManagerConfig<'a> {
     pub program_id: Pubkey,
     pub pool: Pubkey,
     pub payer: &'a (dyn Signer + 'static),
@@ -32,7 +34,7 @@ pub struct SyncPoolConfig<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub enum SyncPoolChange {
+pub enum SyncPoolManagerChange {
     Fee {
         old: FeeType,
         new: FeeType,
@@ -56,7 +58,7 @@ pub enum SyncPoolChange {
     },
 }
 
-impl Display for SyncPoolChange {
+impl Display for SyncPoolManagerChange {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -68,7 +70,7 @@ impl Display for SyncPoolChange {
     }
 }
 
-impl SyncPoolChange {
+impl SyncPoolManagerChange {
     fn attr_name(&self) -> &'static str {
         match self {
             Self::Fee { old, .. } => match old {
@@ -134,7 +136,7 @@ impl SyncPoolChange {
     }
 }
 
-impl<'a> SyncPoolConfig<'a> {
+impl<'a> SyncPoolManagerConfig<'a> {
     pub fn signers_maybe_dup(&self) -> [&'a dyn Signer; 3] {
         [self.payer, self.manager, self.new_manager]
     }
@@ -148,8 +150,6 @@ impl<'a> SyncPoolConfig<'a> {
             manager_fee_account,
             epoch_fee,
             next_epoch_fee,
-            preferred_deposit_validator_vote_address,
-            preferred_withdraw_validator_vote_address,
             stake_deposit_fee,
             stake_withdrawal_fee,
             next_stake_withdrawal_fee,
@@ -162,7 +162,7 @@ impl<'a> SyncPoolConfig<'a> {
             next_sol_withdrawal_fee,
             ..
         }: &StakePool,
-    ) -> Vec<SyncPoolChange> {
+    ) -> Vec<SyncPoolManagerChange> {
         let mut res = vec![];
         let (default_deposit_auth, _bump) =
             FindDepositAuthority { pool: self.pool }.run_for_prog(&self.program_id);
@@ -190,7 +190,7 @@ impl<'a> SyncPoolConfig<'a> {
             ),
         ] {
             if *old_funding_auth != new_funding_auth {
-                res.push(SyncPoolChange::FundingAuth {
+                res.push(SyncPoolManagerChange::FundingAuth {
                     ty,
                     old: *old_funding_auth,
                     new: new_funding_auth,
@@ -240,7 +240,7 @@ impl<'a> SyncPoolConfig<'a> {
                     }
                 };
                 if should_change {
-                    res.push(SyncPoolChange::Fee {
+                    res.push(SyncPoolManagerChange::Fee {
                         old: old_fee,
                         new: new_fee,
                     });
@@ -282,20 +282,20 @@ impl<'a> SyncPoolConfig<'a> {
             ),
         ] {
             if old_fee != new_fee {
-                res.push(SyncPoolChange::Fee {
+                res.push(SyncPoolManagerChange::Fee {
                     old: old_fee,
                     new: new_fee,
                 })
             }
         }
         if *staker != self.staker {
-            res.push(SyncPoolChange::Staker {
+            res.push(SyncPoolManagerChange::Staker {
                 old: *staker,
                 new: self.staker,
             });
         }
         if *manager_fee_account != self.manager_fee_account {
-            res.push(SyncPoolChange::ManagerFeeAccount {
+            res.push(SyncPoolManagerChange::ManagerFeeAccount {
                 old: *manager_fee_account,
                 new: self.manager_fee_account,
             })
@@ -303,7 +303,7 @@ impl<'a> SyncPoolConfig<'a> {
         // do manager last so previous changes can be applied first
         let new_manager = self.manager.pubkey();
         if *manager != new_manager {
-            res.push(SyncPoolChange::Manager {
+            res.push(SyncPoolManagerChange::Manager {
                 old: *manager,
                 new: new_manager,
             })
@@ -311,13 +311,20 @@ impl<'a> SyncPoolConfig<'a> {
         res
     }
 
-    fn change_ix(&self, change: &SyncPoolChange) -> std::io::Result<Instruction> {
+    pub fn changeset_ixs(
+        &self,
+        changeset: &[SyncPoolManagerChange],
+    ) -> std::io::Result<Vec<Instruction>> {
+        changeset.iter().map(|c| self.change_ix(c)).collect()
+    }
+
+    fn change_ix(&self, change: &SyncPoolManagerChange) -> std::io::Result<Instruction> {
         match change {
-            SyncPoolChange::Fee { new, .. } => self.set_fee_ix(new.clone()),
-            SyncPoolChange::ManagerFeeAccount { .. } => self.set_manager_fee_ix(),
-            SyncPoolChange::Staker { .. } => self.set_staker_ix(),
-            SyncPoolChange::Manager { .. } => self.set_manager_ix(),
-            SyncPoolChange::FundingAuth { ty, .. } => self.set_funding_auth_ix(ty.clone()),
+            SyncPoolManagerChange::Fee { new, .. } => self.set_fee_ix(new.clone()),
+            SyncPoolManagerChange::ManagerFeeAccount { .. } => self.set_manager_fee_ix(),
+            SyncPoolManagerChange::Staker { .. } => self.set_staker_ix(),
+            SyncPoolManagerChange::Manager { .. } => self.set_manager_ix(),
+            SyncPoolManagerChange::FundingAuth { ty, .. } => self.set_funding_auth_ix(ty.clone()),
         }
     }
 
@@ -399,16 +406,5 @@ impl<'a> SyncPoolConfig<'a> {
                 new_staker: self.staker,
             },
         )
-    }
-}
-
-fn filter_default_stake_deposit_auth(
-    stake_deposit_auth: Pubkey,
-    default_stake_deposit_auth: &Pubkey,
-) -> Option<Pubkey> {
-    if stake_deposit_auth == *default_stake_deposit_auth {
-        None
-    } else {
-        Some(stake_deposit_auth)
     }
 }

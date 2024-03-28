@@ -16,8 +16,15 @@ pub fn base_cmd(cfg: &TempCliConfig) -> Command {
 pub async fn exec_b64_txs(
     cmd: &mut Command,
     bc: &mut BanksClient,
-) -> Vec<Result<BanksTransactionResultWithMetadata, BanksClientError>> {
-    let Output { stdout, status, .. } = cmd.output().unwrap();
+) -> (
+    Vec<Result<BanksTransactionResultWithMetadata, BanksClientError>>,
+    String,
+) {
+    let Output {
+        stdout,
+        status,
+        stderr,
+    } = cmd.output().unwrap();
     assert!(status.success());
     let stdout = std::str::from_utf8(&stdout).unwrap();
     // run txs in sequence, waiting on result of the prev before exec-ing next
@@ -27,7 +34,7 @@ pub async fn exec_b64_txs(
             res.push(bc.exec_b64_tx(b64.as_bytes()).await);
         }
     }
-    res
+    (res, std::str::from_utf8(&stderr).unwrap().to_owned())
 }
 
 pub fn assert_all_txs_success_nonempty(
