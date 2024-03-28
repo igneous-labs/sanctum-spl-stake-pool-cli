@@ -40,6 +40,8 @@ pub struct CreateConfig<'a, T> {
     pub withdrawal_fee: Fee,
     pub deposit_fee: Fee,
     pub max_validators: u32,
+    // Used to calculate how much to fund the reserve by so that the first VSAs can be
+    // added immediately
     pub starting_validators: usize,
     pub rent: Rent,
 }

@@ -14,9 +14,12 @@ use solana_sdk::{
     pubkey::Pubkey,
     signature::Signature,
     signer::Signer,
-    signers::Signers,
     transaction::VersionedTransaction,
 };
+
+use crate::sorted_signers::SortedSigners;
+
+pub const MAX_ADD_VALIDATORS_IX_PER_TX: usize = 7;
 
 const CU_BUFFER_RATIO: f64 = 1.15;
 
@@ -83,74 +86,54 @@ pub async fn handle_tx_full(
     .await;
 }
 
-/// newtype to impl Signers on to avoid lifetime errors from Vec::dedup()
-pub struct SortedSigners<'slice, 'signer>(pub &'slice [&'signer dyn Signer]);
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
 
-impl<'slice, 'signer> SortedSigners<'slice, 'signer> {
-    pub fn iter(&self) -> SortedSignerIter<'_, '_, '_> {
-        SortedSignerIter {
-            inner: self,
-            curr_i: 0,
-        }
-    }
-}
+    use solana_sdk::signature::Keypair;
 
-pub struct SortedSignerIter<'a, 'slice, 'signer> {
-    inner: &'a SortedSigners<'slice, 'signer>,
-    curr_i: usize,
-}
+    use crate::{pool_config::SyncValidatorListConfig, test_utils::TX_SIZE_LIMIT};
 
-impl<'a, 'slice, 'signer> Iterator for SortedSignerIter<'a, 'slice, 'signer> {
-    type Item = &'a dyn Signer;
+    use super::*;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        let curr = self.inner.0.get(self.curr_i)?;
-        let curr_pk = curr.pubkey();
-        self.curr_i += 1;
-        while let Some(next) = self.inner.0.get(self.curr_i) {
-            if next.pubkey() != curr_pk {
-                break;
-            }
-            self.curr_i += 1;
-        }
-        Some(*curr)
-    }
-}
-
-impl<'slice, 'signer> Signers for SortedSigners<'slice, 'signer> {
-    fn pubkeys(&self) -> Vec<Pubkey> {
-        self.iter().map(|s| s.pubkey()).collect()
-    }
-
-    fn try_pubkeys(&self) -> Result<Vec<Pubkey>, solana_sdk::signer::SignerError> {
-        self.iter().map(|s| s.try_pubkey()).collect()
-    }
-
-    fn sign_message(&self, message: &[u8]) -> Vec<Signature> {
-        self.iter().map(|s| s.sign_message(message)).collect()
-    }
-
-    fn try_sign_message(
-        &self,
-        message: &[u8],
-    ) -> Result<Vec<Signature>, solana_sdk::signer::SignerError> {
-        self.iter().map(|s| s.try_sign_message(message)).collect()
-    }
-
-    fn is_interactive(&self) -> bool {
-        self.iter().any(|s| s.is_interactive())
-    }
-}
-
-/*
-pub async fn fetch_srlut(rpc: &RpcClient) -> AddressLookupTableAccount {
-    let srlut = rpc.get_account(&srlut::ID).await.unwrap();
-    AddressLookupTableAccount {
-        key: srlut::ID,
-        addresses: AddressLookupTable::deserialize(&srlut.data)
+    #[test]
+    fn check_max_add_validators_ix_per_tx_limit() {
+        const N_SIGNERS: usize = 2;
+        let validators: HashSet<Pubkey> = (0..MAX_ADD_VALIDATORS_IX_PER_TX)
+            .map(|_| Pubkey::new_unique())
+            .collect();
+        let payer = Keypair::new();
+        let staker = Keypair::new();
+        let svlc = SyncValidatorListConfig {
+            program_id: Pubkey::new_unique(),
+            payer: &payer,
+            staker: &staker,
+            pool: Pubkey::new_unique(),
+            validator_list: Pubkey::new_unique(),
+            reserve: Pubkey::new_unique(),
+            validators,
+        };
+        let (add, _remove) = svlc.changeset(&[]);
+        for add_validator_ix_chunk in svlc
+            .add_validators_ixs(add)
             .unwrap()
-            .addresses
-            .into(),
+            .as_slice()
+            .chunks(MAX_ADD_VALIDATORS_IX_PER_TX)
+        {
+            let mut ixs = vec![
+                ComputeBudgetInstruction::set_compute_unit_limit(0),
+                ComputeBudgetInstruction::set_compute_unit_price(0),
+            ];
+            ixs.extend(add_validator_ix_chunk.iter().cloned());
+            let tx = VersionedTransaction {
+                signatures: vec![Signature::default(); N_SIGNERS],
+                message: VersionedMessage::V0(
+                    Message::try_compile(&payer.pubkey(), &ixs, &[], Hash::default()).unwrap(),
+                ),
+            };
+            let tx_len = bincode::serialize(&tx).unwrap().len();
+            // println!("{tx_len}"); // 1231 (WEW)
+            assert!(tx_len < TX_SIZE_LIMIT);
+        }
     }
 }
- */

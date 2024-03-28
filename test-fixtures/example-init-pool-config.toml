@@ -17,7 +17,7 @@ sol-withdraw-auth = "DAgQZufbVTGvJkDd3FhtcLPcmWXX7h5jzcePyVKCWZoL" # defaults to
 # preferred-deposit-validator = "BLADE1qNA1uNjRgER6DtUFf7FU3c1TWLLdpPeEcKatZ2" # defaults to None if not specified
 # preferred-withdraw-validator = "FnAPJkzf19s87sm24Qhv6bHZMZvZ43gjNUBRgjwXpD4v" # defaults to None if not specified
 
-max-validators = 10
+max-validators = 2
 
 stake-deposit-referral-fee = 50
 sol-deposit-referral-fee = 0

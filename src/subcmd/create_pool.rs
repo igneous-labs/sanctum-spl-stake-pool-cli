@@ -13,9 +13,9 @@ use spl_stake_pool_interface::{AccountType, Fee, FutureEpochFee, Lockup, StakePo
 use spl_token_2022::{extension::StateWithExtensions, state::Mint};
 
 use crate::{
-    pool_config::{ConfigFileRaw, CreateConfig, SyncPoolManagerConfig},
+    pool_config::{ConfigFileRaw, CreateConfig, SyncPoolManagerConfig, SyncValidatorListConfig},
     subcmd::Subcmd,
-    tx_utils::{handle_tx_full, with_auto_cb_ixs},
+    tx_utils::{handle_tx_full, with_auto_cb_ixs, MAX_ADD_VALIDATORS_IX_PER_TX},
     utils::filter_default_stake_deposit_auth,
 };
 
@@ -69,8 +69,13 @@ impl CreatePoolArgs {
             .map(|m| m.as_ref())
             .unwrap_or(payer.as_ref());
         let mint = Pubkey::from_str(&mint.unwrap()).unwrap();
+
+        let max_validators = max_validators.unwrap();
         let validators = validators.unwrap_or(Vec::new());
         let starting_validators = validators.len();
+        if u32::try_from(starting_validators).unwrap() > max_validators {
+            panic!("Number of starting validators greater than max");
+        }
 
         let mut fetched = rpc
             .get_multiple_accounts(&[sysvar::rent::ID, mint])
@@ -122,7 +127,8 @@ impl CreatePoolArgs {
         let stake_withdrawal_fee = stake_withdrawal_fee.unwrap_or(ZERO_FEE);
         let sol_withdrawal_fee = sol_withdrawal_fee.unwrap_or(ZERO_FEE);
         let withdrawal_fee = select_higher_fee(&stake_withdrawal_fee, &sol_withdrawal_fee);
-        let staker = staker.map_or_else(|| manager.pubkey(), |s| Pubkey::from_str(&s).unwrap());
+        let staker = staker.map(|s| parse_signer(&s).unwrap());
+        let staker = staker.as_ref().map_or_else(|| manager, |s| s.as_ref());
         let stake_deposit_auth = stake_deposit_auth.map_or_else(
             || None,
             |s| {
@@ -134,7 +140,6 @@ impl CreatePoolArgs {
         );
         let sol_deposit_auth = sol_deposit_auth.map(|s| parse_pubkey_src(&s).unwrap().pubkey());
         let sol_withdraw_auth = sol_withdraw_auth.map(|s| parse_pubkey_src(&s).unwrap().pubkey());
-        let max_validators = max_validators.unwrap();
 
         let cc = CreateConfig {
             mint: Keyed {
@@ -148,7 +153,7 @@ impl CreatePoolArgs {
             reserve: reserve.as_ref(),
             manager,
             manager_fee_account,
-            staker,
+            staker: staker.pubkey(),
             deposit_auth: stake_deposit_auth,
             deposit_referral_fee,
             epoch_fee: epoch_fee.clone(),
@@ -207,6 +212,8 @@ impl CreatePoolArgs {
         )
         .await;
 
+        // setup fees and other pool settings that's not covered by Initialize
+
         // use a dummy instead of fetching the newly created pool from rpc so that it works for --dump-msg
         //
         // the sol_*_fees are going to be set to the same value as the
@@ -215,7 +222,7 @@ impl CreatePoolArgs {
         // sol deposit authority is set to stake deposit authority (last optional account) during initialization
         //
         // sol withdraw authority is set to None during initialization
-        let created_dummy = StakePool {
+        let dummy_created_pool = StakePool {
             account_type: AccountType::StakePool,
             manager: cc.manager.pubkey(),
             staker: cc.staker,
@@ -258,7 +265,7 @@ impl CreatePoolArgs {
             payer: cc.payer,
             manager,
             new_manager: manager,
-            staker,
+            staker: staker.pubkey(),
             manager_fee_account,
             sol_deposit_auth,
             stake_deposit_auth,
@@ -272,7 +279,7 @@ impl CreatePoolArgs {
             sol_deposit_fee,
         };
 
-        let changeset = spmc.changeset(&created_dummy);
+        let changeset = spmc.changeset(&dummy_created_pool);
         for change in changeset.iter() {
             eprintln!("{change}");
         }
@@ -291,6 +298,58 @@ impl CreatePoolArgs {
             &mut spmc.signers_maybe_dup(),
         )
         .await;
+
+        // Setup validator list
+
+        // use a dummy instead of fetching the newly created pool from rpc so that it works for --dump-msg
+        let svlc = SyncValidatorListConfig {
+            program_id: args.program,
+            payer: payer.as_ref(),
+            staker,
+            pool: pool.pubkey(),
+            validator_list: validator_list.pubkey(),
+            reserve: reserve.pubkey(),
+            validators: validators
+                .into_iter()
+                .map(|v| Pubkey::from_str(&v.vote).unwrap())
+                .collect(),
+        };
+        // starting validator list is empty
+        let (add, _remove) = svlc.changeset(&[]);
+        eprint!("Adding validators: ");
+        for to_add in add.clone() {
+            eprint!("{to_add}, ");
+        }
+        eprintln!();
+
+        for add_validator_ix_chunk in svlc
+            .add_validators_ixs(add)
+            .unwrap()
+            .as_slice()
+            .chunks(MAX_ADD_VALIDATORS_IX_PER_TX)
+        {
+            let add_validator_ix_chunk = match args.send_mode {
+                TxSendMode::DumpMsg => Vec::from(add_validator_ix_chunk),
+                _ => {
+                    with_auto_cb_ixs(
+                        &rpc,
+                        &payer.pubkey(),
+                        Vec::from(add_validator_ix_chunk),
+                        &[],
+                        args.fee_limit_cu,
+                    )
+                    .await
+                }
+            };
+            handle_tx_full(
+                &rpc,
+                args.send_mode,
+                &add_validator_ix_chunk,
+                &[],
+                &mut svlc.signers_maybe_dup(),
+            )
+            .await;
+        }
     }
 }
 

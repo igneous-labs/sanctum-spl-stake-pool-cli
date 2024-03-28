@@ -7,4 +7,4 @@ mod sync_validator_list;
 pub use create::*;
 pub use file::*;
 pub use sync_pool_manager::*;
-//pub use sync_validator_list::*;
+pub use sync_validator_list::*;
