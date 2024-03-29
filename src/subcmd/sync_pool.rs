@@ -72,7 +72,7 @@ impl SyncPoolArgs {
         let new_manager = manager.as_ref().map(|s| parse_signer(s).unwrap());
         let new_manager = new_manager
             .as_ref()
-            .map_or_else(|| curr_manager, |c| c.as_ref());
+            .map_or_else(|| curr_manager, |n| n.as_ref());
 
         let [manager_fee_account, staker] = [
             (manager_fee_account, stake_pool.manager_fee_account),
