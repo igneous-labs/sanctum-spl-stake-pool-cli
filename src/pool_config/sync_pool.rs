@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use sanctum_spl_stake_pool_lib::FindDepositAuthority;
+use sanctum_spl_stake_pool_lib::{CmpFee, EqFeeType, FindDepositAuthority};
 use solana_sdk::{instruction::Instruction, pubkey::Pubkey, signer::Signer};
 use spl_stake_pool_interface::{
     set_fee_ix_with_program_id, set_funding_authority_ix_with_program_id,
@@ -34,7 +34,7 @@ pub struct SyncPoolConfig<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub enum SyncPoolManagerChange {
+pub enum SyncPoolChange {
     Fee {
         old: FeeType,
         new: FeeType,
@@ -58,7 +58,7 @@ pub enum SyncPoolManagerChange {
     },
 }
 
-impl Display for SyncPoolManagerChange {
+impl Display for SyncPoolChange {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -70,7 +70,7 @@ impl Display for SyncPoolManagerChange {
     }
 }
 
-impl SyncPoolManagerChange {
+impl SyncPoolChange {
     fn attr_name(&self) -> &'static str {
         match self {
             Self::Fee { old, .. } => match old {
@@ -105,9 +105,9 @@ impl SyncPoolManagerChange {
                     format!("{}/{}", fee.numerator, fee.denominator)
                 }
             },
-            Self::ManagerFeeAccount { old, .. } => old.to_string(),
-            Self::Staker { old, .. } => old.to_string(),
-            Self::Manager { old, .. } => old.to_string(),
+            Self::ManagerFeeAccount { old, .. }
+            | Self::Staker { old, .. }
+            | Self::Manager { old, .. } => old.to_string(),
             Self::FundingAuth { old, .. } => {
                 old.map_or_else(|| "None".to_owned(), |pk| pk.to_string())
             }
@@ -162,7 +162,7 @@ impl<'a> SyncPoolConfig<'a> {
             next_sol_withdrawal_fee,
             ..
         }: &StakePool,
-    ) -> Vec<SyncPoolManagerChange> {
+    ) -> Vec<SyncPoolChange> {
         let mut res = vec![];
         let (default_deposit_auth, _bump) =
             FindDepositAuthority { pool: self.pool }.run_for_prog(&self.program_id);
@@ -190,7 +190,7 @@ impl<'a> SyncPoolConfig<'a> {
             ),
         ] {
             if *old_funding_auth != new_funding_auth {
-                res.push(SyncPoolManagerChange::FundingAuth {
+                res.push(SyncPoolChange::FundingAuth {
                     ty,
                     old: *old_funding_auth,
                     new: new_funding_auth,
@@ -226,7 +226,7 @@ impl<'a> SyncPoolConfig<'a> {
                 next_stake_withdrawal_fee,
             ),
         ] {
-            if old_fee != new_fee {
+            if EqFeeType(&old_fee) != EqFeeType(&new_fee) {
                 let new_fee_inner = match &new_fee {
                     FeeType::Epoch { fee }
                     | FeeType::SolWithdrawal { fee }
@@ -236,11 +236,11 @@ impl<'a> SyncPoolConfig<'a> {
                 let should_change = match next_fee {
                     FutureEpochFee::None => true,
                     FutureEpochFee::One { fee } | FutureEpochFee::Two { fee } => {
-                        fee != new_fee_inner
+                        CmpFee(fee) != CmpFee(new_fee_inner)
                     }
                 };
                 if should_change {
-                    res.push(SyncPoolManagerChange::Fee {
+                    res.push(SyncPoolChange::Fee {
                         old: old_fee,
                         new: new_fee,
                     });
@@ -281,50 +281,46 @@ impl<'a> SyncPoolConfig<'a> {
                 },
             ),
         ] {
-            if old_fee != new_fee {
-                res.push(SyncPoolManagerChange::Fee {
+            if EqFeeType(&old_fee) != EqFeeType(&new_fee) {
+                res.push(SyncPoolChange::Fee {
                     old: old_fee,
                     new: new_fee,
                 })
             }
         }
         if *staker != self.staker {
-            res.push(SyncPoolManagerChange::Staker {
+            res.push(SyncPoolChange::Staker {
                 old: *staker,
                 new: self.staker,
             });
         }
         if *manager_fee_account != self.manager_fee_account {
-            res.push(SyncPoolManagerChange::ManagerFeeAccount {
+            res.push(SyncPoolChange::ManagerFeeAccount {
                 old: *manager_fee_account,
                 new: self.manager_fee_account,
             })
         }
         // do manager last so previous changes can be applied first
-        let new_manager = self.manager.pubkey();
-        if *manager != new_manager {
-            res.push(SyncPoolManagerChange::Manager {
+        if *manager != self.new_manager.pubkey() {
+            res.push(SyncPoolChange::Manager {
                 old: *manager,
-                new: new_manager,
+                new: self.new_manager.pubkey(),
             })
         }
         res
     }
 
-    pub fn changeset_ixs(
-        &self,
-        changeset: &[SyncPoolManagerChange],
-    ) -> std::io::Result<Vec<Instruction>> {
+    pub fn changeset_ixs(&self, changeset: &[SyncPoolChange]) -> std::io::Result<Vec<Instruction>> {
         changeset.iter().map(|c| self.change_ix(c)).collect()
     }
 
-    fn change_ix(&self, change: &SyncPoolManagerChange) -> std::io::Result<Instruction> {
+    fn change_ix(&self, change: &SyncPoolChange) -> std::io::Result<Instruction> {
         match change {
-            SyncPoolManagerChange::Fee { new, .. } => self.set_fee_ix(new.clone()),
-            SyncPoolManagerChange::ManagerFeeAccount { .. } => self.set_manager_fee_ix(),
-            SyncPoolManagerChange::Staker { .. } => self.set_staker_ix(),
-            SyncPoolManagerChange::Manager { .. } => self.set_manager_ix(),
-            SyncPoolManagerChange::FundingAuth { ty, .. } => self.set_funding_auth_ix(ty.clone()),
+            SyncPoolChange::Fee { new, .. } => self.set_fee_ix(new.clone()),
+            SyncPoolChange::ManagerFeeAccount { .. } => self.set_manager_fee_ix(),
+            SyncPoolChange::Staker { .. } => self.set_staker_ix(),
+            SyncPoolChange::Manager { .. } => self.set_manager_ix(),
+            SyncPoolChange::FundingAuth { ty, .. } => self.set_funding_auth_ix(ty.clone()),
         }
     }
 
@@ -406,5 +402,108 @@ impl<'a> SyncPoolConfig<'a> {
                 new_staker: self.staker,
             },
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use sanctum_spl_stake_pool_lib::ZERO_FEE;
+    use solana_sdk::signature::Keypair;
+    use spl_stake_pool_interface::{AccountType, Lockup};
+
+    use crate::test_utils::assert_tx_with_cu_ixs_within_size_limits;
+
+    use super::*;
+
+    #[test]
+    fn check_changeset_ixs_within_tx_size_limits() {
+        // 7 fee types + 3 funding auth + manager + manager fee + staker
+        const WORST_CASE_IXS_LEN: usize = 13;
+
+        let payer = Keypair::new();
+        let manager = Keypair::new();
+        let new_manager = Keypair::new();
+
+        // make all configurable values different
+        // and make all SetFundingAuth set to Some for worst case number of accounts
+
+        let sp = StakePool {
+            account_type: AccountType::StakePool,
+            manager: manager.pubkey(),
+            staker: Pubkey::new_unique(),
+            stake_deposit_authority: Pubkey::new_unique(),
+            manager_fee_account: Pubkey::new_unique(),
+            epoch_fee: ZERO_FEE,
+            next_epoch_fee: FutureEpochFee::None,
+            stake_deposit_fee: ZERO_FEE,
+            stake_withdrawal_fee: ZERO_FEE,
+            next_stake_withdrawal_fee: FutureEpochFee::None,
+            stake_referral_fee: 0,
+            sol_deposit_authority: None,
+            sol_deposit_fee: ZERO_FEE,
+            sol_referral_fee: 0,
+            sol_withdraw_authority: None,
+            sol_withdrawal_fee: ZERO_FEE,
+            next_sol_withdrawal_fee: FutureEpochFee::None,
+            // dont cares:
+            token_program_id: Pubkey::new_unique(),
+            pool_mint: Pubkey::new_unique(),
+            validator_list: Pubkey::new_unique(),
+            reserve_stake: Pubkey::new_unique(),
+            preferred_deposit_validator_vote_address: None,
+            preferred_withdraw_validator_vote_address: None,
+            lockup: Lockup {
+                unix_timestamp: 0,
+                epoch: 0,
+                custodian: Pubkey::default(),
+            },
+            total_lamports: 0,
+            pool_token_supply: 0,
+            last_update_epoch: 0,
+            stake_withdraw_bump_seed: 255,
+            last_epoch_pool_token_supply: 0,
+            last_epoch_total_lamports: 0,
+        };
+
+        let spc = SyncPoolConfig {
+            program_id: Pubkey::new_unique(),
+            pool: Pubkey::new_unique(),
+            payer: &payer,
+            manager: &manager,
+            new_manager: &new_manager,
+            staker: Pubkey::new_unique(),
+            manager_fee_account: Pubkey::new_unique(),
+            sol_deposit_auth: Some(Pubkey::new_unique()),
+            stake_deposit_auth: Some(Pubkey::new_unique()),
+            sol_withdraw_auth: Some(Pubkey::new_unique()),
+            sol_deposit_referral_fee: 1,
+            stake_deposit_referral_fee: 1,
+            epoch_fee: Fee {
+                denominator: 10_000,
+                numerator: 1,
+            },
+            stake_withdrawal_fee: Fee {
+                denominator: 10_000,
+                numerator: 1,
+            },
+            sol_withdrawal_fee: Fee {
+                denominator: 10_000,
+                numerator: 1,
+            },
+            stake_deposit_fee: Fee {
+                denominator: 10_000,
+                numerator: 1,
+            },
+            sol_deposit_fee: Fee {
+                denominator: 10_000,
+                numerator: 1,
+            },
+        };
+
+        let changeset = spc.changeset(&sp);
+        let ixs = spc.changeset_ixs(&changeset).unwrap();
+        assert_eq!(ixs.len(), WORST_CASE_IXS_LEN);
+        // size = 782
+        assert_tx_with_cu_ixs_within_size_limits(&payer.pubkey(), ixs.into_iter());
     }
 }

@@ -1,9 +1,9 @@
-use std::{error::Error, path::PathBuf, str::FromStr};
+use std::{cmp::Ordering, error::Error, path::PathBuf, str::FromStr};
 
 use clap::Args;
 use sanctum_associated_token_lib::FindAtaAddressArgs;
 use sanctum_solana_cli_utils::{parse_pubkey_src, parse_signer, TxSendMode};
-use sanctum_spl_stake_pool_lib::{FindDepositAuthority, ZERO_FEE};
+use sanctum_spl_stake_pool_lib::{CmpFee, FindDepositAuthority, ZERO_FEE};
 use solana_readonly_account::{keyed::Keyed, ReadonlyAccountOwner};
 use solana_sdk::{
     account::Account, program_option::COption, pubkey::Pubkey, rent::Rent, system_program, sysvar,
@@ -259,7 +259,7 @@ impl CreatePoolArgs {
             last_epoch_pool_token_supply: 0,
             last_epoch_total_lamports: 0,
         };
-        let spmc = SyncPoolConfig {
+        let spc = SyncPoolConfig {
             program_id: args.program,
             pool: cc.pool.pubkey(),
             payer: cc.payer,
@@ -279,11 +279,11 @@ impl CreatePoolArgs {
             sol_deposit_fee,
         };
 
-        let changeset = spmc.changeset(&dummy_created_pool);
+        let changeset = spc.changeset(&dummy_created_pool);
         for change in changeset.iter() {
             eprintln!("{change}");
         }
-        let sync_pool_ixs = spmc.changeset_ixs(&changeset).unwrap();
+        let sync_pool_ixs = spc.changeset_ixs(&changeset).unwrap();
         let sync_pool_ixs = match args.send_mode {
             TxSendMode::DumpMsg => sync_pool_ixs,
             _ => {
@@ -295,7 +295,7 @@ impl CreatePoolArgs {
             args.send_mode,
             &sync_pool_ixs,
             &[],
-            &mut spmc.signers_maybe_dup(),
+            &mut spc.signers_maybe_dup(),
         )
         .await;
 
@@ -377,17 +377,8 @@ fn verify_mint(mint: &Account, manager_pk: &Pubkey) -> Result<(), Box<dyn Error>
 }
 
 fn select_higher_fee(s1: &Fee, s2: &Fee) -> Fee {
-    if s1.numerator == 0 || s1.denominator == 0 {
-        return s2.clone();
-    }
-    if s2.numerator == 0 || s2.denominator == 0 {
-        return s1.clone();
-    }
-    let s1_cmp = s1.numerator.saturating_mul(s2.denominator);
-    let s2_cmp = s2.numerator.saturating_mul(s1.denominator);
-    if s1_cmp > s2_cmp {
-        s1.clone()
-    } else {
-        s2.clone()
+    match CmpFee(s1).cmp(&CmpFee(s2)) {
+        Ordering::Less | Ordering::Equal => s2.clone(),
+        Ordering::Greater => s1.clone(),
     }
 }

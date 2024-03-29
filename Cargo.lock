@@ -3310,7 +3310,7 @@ dependencies = [
 [[package]]
 name = "sanctum-associated-token-lib"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=420029c#420029c06355f2a9beefb62086317b6d0b6215f5"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=b2b880b#b2b880b869cf4226ed4c190626227e1078ac8f22"
 dependencies = [
  "solana-program",
  "solana-readonly-account",
@@ -3333,7 +3333,7 @@ dependencies = [
 [[package]]
 name = "sanctum-solana-cli-utils"
 version = "0.2.0"
-source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=420029c#420029c06355f2a9beefb62086317b6d0b6215f5"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=b2b880b#b2b880b869cf4226ed4c190626227e1078ac8f22"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3349,7 +3349,7 @@ dependencies = [
 [[package]]
 name = "sanctum-solana-test-utils"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=420029c#420029c06355f2a9beefb62086317b6d0b6215f5"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=b2b880b#b2b880b869cf4226ed4c190626227e1078ac8f22"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3412,7 +3412,7 @@ dependencies = [
 [[package]]
 name = "sanctum-spl-stake-pool-lib"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=420029c#420029c06355f2a9beefb62086317b6d0b6215f5"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=b2b880b#b2b880b869cf4226ed4c190626227e1078ac8f22"
 dependencies = [
  "borsh 0.10.3",
  "solana-program",
@@ -5189,7 +5189,7 @@ dependencies = [
 [[package]]
 name = "spl_associated_token_account_interface"
 version = "2.0.0"
-source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=420029c#420029c06355f2a9beefb62086317b6d0b6215f5"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=b2b880b#b2b880b869cf4226ed4c190626227e1078ac8f22"
 dependencies = [
  "borsh 0.10.3",
  "num-derive 0.4.2",
@@ -5201,7 +5201,7 @@ dependencies = [
 [[package]]
 name = "spl_stake_pool_interface"
 version = "1.0.0"
-source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=420029c#420029c06355f2a9beefb62086317b6d0b6215f5"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=b2b880b#b2b880b869cf4226ed4c190626227e1078ac8f22"
 dependencies = [
  "borsh 0.10.3",
  "serde",
@@ -5211,7 +5211,7 @@ dependencies = [
 [[package]]
 name = "spl_token_interface"
 version = "4.0.0"
-source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=420029c#420029c06355f2a9beefb62086317b6d0b6215f5"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=b2b880b#b2b880b869cf4226ed4c190626227e1078ac8f22"
 dependencies = [
  "borsh 0.10.3",
  "num-derive 0.4.2",

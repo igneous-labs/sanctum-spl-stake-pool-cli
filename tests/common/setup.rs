@@ -36,7 +36,7 @@ pub async fn setup_init_manager_payer(
             },
         )
         .add_test_fixtures_account("srlut.json");
-    // TODO: reenable this feature when it actly goes live
+    // TODO: reenable this cursed feature when it actly goes live
     pt.deactivate_feature(stake_raise_minimum_delegation_to_1_sol::ID);
     let ctx = pt.start_with_context().await;
     ctx.set_sysvar(&Clock {

@@ -92,13 +92,14 @@ mod tests {
 
     use solana_sdk::signature::Keypair;
 
-    use crate::{pool_config::SyncValidatorListConfig, test_utils::TX_SIZE_LIMIT};
+    use crate::{
+        pool_config::SyncValidatorListConfig, test_utils::assert_tx_with_cu_ixs_within_size_limits,
+    };
 
     use super::*;
 
     #[test]
     fn check_max_add_validators_ix_per_tx_limit() {
-        const N_SIGNERS: usize = 2;
         let validators: HashSet<Pubkey> = (0..MAX_ADD_VALIDATORS_IX_PER_TX)
             .map(|_| Pubkey::new_unique())
             .collect();
@@ -114,26 +115,15 @@ mod tests {
             validators,
         };
         let (add, _remove) = svlc.changeset(&[]);
-        for add_validator_ix_chunk in svlc
-            .add_validators_ixs(add)
-            .unwrap()
-            .as_slice()
-            .chunks(MAX_ADD_VALIDATORS_IX_PER_TX)
-        {
-            let mut ixs = vec![
-                ComputeBudgetInstruction::set_compute_unit_limit(0),
-                ComputeBudgetInstruction::set_compute_unit_price(0),
-            ];
-            ixs.extend(add_validator_ix_chunk.iter().cloned());
-            let tx = VersionedTransaction {
-                signatures: vec![Signature::default(); N_SIGNERS],
-                message: VersionedMessage::V0(
-                    Message::try_compile(&payer.pubkey(), &ixs, &[], Hash::default()).unwrap(),
-                ),
-            };
-            let tx_len = bincode::serialize(&tx).unwrap().len();
-            // println!("{tx_len}"); // 1231 WEW
-            assert!(tx_len < TX_SIZE_LIMIT);
-        }
+        let ixs = svlc.add_validators_ixs(add).unwrap();
+        let mut iter = ixs.as_slice().chunks(MAX_ADD_VALIDATORS_IX_PER_TX);
+        let add_validator_ix_chunk = iter.next().unwrap();
+        assert_eq!(add_validator_ix_chunk.len(), MAX_ADD_VALIDATORS_IX_PER_TX);
+        // size = 1231 WEW
+        assert_tx_with_cu_ixs_within_size_limits(
+            &payer.pubkey(),
+            add_validator_ix_chunk.iter().cloned(),
+        );
+        assert!(iter.next().is_none());
     }
 }

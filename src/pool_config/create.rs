@@ -179,17 +179,9 @@ mod tests {
         token::{tokenkeg::mock_tokenkeg_mint, MockMintArgs},
         IntoAccount,
     };
-    use solana_sdk::{
-        compute_budget::ComputeBudgetInstruction,
-        hash::Hash,
-        message::{v0::Message, VersionedMessage},
-        pubkey::Pubkey,
-        signature::{Keypair, Signature},
-        signer::Signer,
-        transaction::VersionedTransaction,
-    };
+    use solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer};
 
-    use crate::test_utils::TX_SIZE_LIMIT;
+    use crate::test_utils::assert_tx_with_cu_ixs_within_size_limits;
 
     use super::*;
 
@@ -247,35 +239,10 @@ mod tests {
             starting_validators: 1,
             rent: Rent::default(),
         };
-        let mut ixs = vec![
-            ComputeBudgetInstruction::set_compute_unit_limit(0),
-            ComputeBudgetInstruction::set_compute_unit_price(0),
-        ];
-        ixs.extend(config.initialize_tx_ixs().unwrap());
 
-        /*
-        // compute budget instructions make it go to 1251 without use of srlut,
-        // not anymore now that we separate create reserve out
-        let srlut =
-            KeyedUiAccount::from_file(test_fixtures_dir().join("srlut.json")).to_keyed_account();
-        let srlut = AddressLookupTableAccount {
-            key: srlut.pubkey,
-            addresses: AddressLookupTable::deserialize(&srlut.data())
-                .unwrap()
-                .addresses
-                .into(),
-        };
-         */
-
-        let tx = VersionedTransaction {
-            signatures: vec![Signature::default(); 4],
-            message: VersionedMessage::V0(
-                Message::try_compile(&payer.pubkey(), &ixs, &[], Hash::default()).unwrap(),
-            ),
-        };
-
-        let tx_len = bincode::serialize(&tx).unwrap().len();
-        // println!("{tx_len}");
-        assert!(tx_len < TX_SIZE_LIMIT);
+        assert_tx_with_cu_ixs_within_size_limits(
+            &payer.pubkey(),
+            config.initialize_tx_ixs().unwrap().into_iter(),
+        );
     }
 }

@@ -19,12 +19,12 @@ tokio = { version = "^1", features = ["rt-multi-thread"] }
 toml = "^0.8" # borsh-derive 0.9 -> proc-macro-crate 0.1.5 -> toml ^0.5, but 0.5 has the ValueAfterTable bug so we're getting 2 toml vers
 
 # sanctum-solana-utils
-spl_associated_token_account_interface = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "420029c" }
-spl_stake_pool_interface = { features = ["serde"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "420029c" }
-spl_token_interface = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "420029c" }
-sanctum-associated-token-lib = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "420029c" }
-sanctum-solana-cli-utils = { features = ["clap"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "420029c" }
-sanctum-spl-stake-pool-lib = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "420029c" }
+spl_associated_token_account_interface = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "b2b880b" }
+spl_stake_pool_interface = { features = ["serde"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "b2b880b" }
+spl_token_interface = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "b2b880b" }
+sanctum-associated-token-lib = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "b2b880b" }
+sanctum-solana-cli-utils = { features = ["clap"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "b2b880b" }
+sanctum-spl-stake-pool-lib = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "b2b880b" }
 
 # solana
 # keeping to 1.17.6 for now because later versions have some shit with the LoadedPrograms cache not loading
@@ -38,6 +38,6 @@ solana-transaction-status = "~1.17" # need to explicitly specify or cargo pulls 
 [dev-dependencies]
 assert_cmd = "^1"
 data-encoding = "^2"
-sanctum-solana-test-utils = { features = ["banks-rpc-server", "cli", "token"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "420029c" }
+sanctum-solana-test-utils = { features = ["banks-rpc-server", "cli", "token"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "b2b880b" }
 solana-program-test = "~1.17"
 spl-token = "^4"
