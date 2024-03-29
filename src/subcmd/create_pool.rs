@@ -13,7 +13,10 @@ use spl_stake_pool_interface::{AccountType, Fee, FutureEpochFee, Lockup, StakePo
 use spl_token_2022::{extension::StateWithExtensions, state::Mint};
 
 use crate::{
-    pool_config::{ConfigFileRaw, CreateConfig, SyncPoolConfig, SyncValidatorListConfig},
+    pool_config::{
+        print_adding_validators_msg, ConfigFileRaw, CreateConfig, SyncPoolConfig,
+        SyncValidatorListConfig,
+    },
     subcmd::Subcmd,
     tx_utils::{handle_tx_full, with_auto_cb_ixs, MAX_ADD_VALIDATORS_IX_PER_TX},
     utils::filter_default_stake_deposit_auth,
@@ -321,7 +324,6 @@ impl CreatePoolArgs {
 
         // Setup validator list
 
-        // use a dummy instead of fetching the newly created pool from rpc so that it works for --dump-msg
         let svlc = SyncValidatorListConfig {
             program_id: args.program,
             payer: payer.as_ref(),
@@ -339,11 +341,7 @@ impl CreatePoolArgs {
 
         // starting validator list is empty
         let (add, _remove) = svlc.add_remove_changeset(&[]);
-        eprint!("Adding validators: ");
-        for to_add in add.clone() {
-            eprint!("{to_add}, ");
-        }
-        eprintln!();
+        print_adding_validators_msg(add.clone());
 
         for add_validator_ix_chunk in svlc
             .add_validators_ixs(add)

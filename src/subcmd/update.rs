@@ -14,7 +14,7 @@ use crate::update::update_pool_if_needed;
 use super::Subcmd;
 
 #[derive(Args, Debug)]
-#[command(long_about = "(Manager only) sync stake pool settings with a pool config file")]
+#[command(long_about = "Run the complete epoch update crank for a stake pool")]
 pub struct UpdateArgs {
     #[arg(
         help = "Pubkey of the pool to update",

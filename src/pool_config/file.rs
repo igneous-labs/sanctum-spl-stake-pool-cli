@@ -137,6 +137,6 @@ mod tests {
             "FnAPJkzf19s87sm24Qhv6bHZMZvZ43gjNUBRgjwXpD4v"
         );
 
-        println!("{}", ConfigFileTomlOutput { pool: &res });
+        eprintln!("{}", ConfigFileTomlOutput { pool: &res });
     }
 }
