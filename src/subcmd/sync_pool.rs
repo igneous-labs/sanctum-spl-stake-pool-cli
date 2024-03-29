@@ -14,7 +14,7 @@ use crate::{
 use super::Subcmd;
 
 #[derive(Args, Debug)]
-#[command(long_about = "Create a new stake pool")]
+#[command(long_about = "(Manager only) sync stake pool settings with a pool config file")]
 pub struct SyncPoolArgs {
     #[arg(help = "Path to pool config file to update the stake pool's settings to")]
     pub pool_config: PathBuf,
