@@ -12,19 +12,33 @@ use spl_stake_pool_interface::{
     ValidatorStakeInfo,
 };
 
-use crate::tx_utils::handle_tx_full;
+use crate::tx_utils::{handle_tx_full, with_auto_cb_ixs};
 
 const MAX_VALIDATORS_TO_UPDATE_PER_TX: usize = 11;
 
+pub struct UpdatePoolIfNeededArgs<'a> {
+    pub rpc: &'a RpcClient,
+    pub send_mode: TxSendMode,
+    pub payer: &'a (dyn Signer + 'static),
+    pub program_id: Pubkey,
+    pub current_epoch: u64,
+    pub stake_pool: Keyed<&'a Account>,
+    pub validator_list_entries: &'a [ValidatorStakeInfo],
+    pub fee_limit_cu: u64,
+}
+
 // ignores entries already updated for this epoch
 pub async fn update_pool_if_needed(
-    rpc: &RpcClient,
-    send_mode: TxSendMode,
-    payer: &dyn Signer,
-    program_id: Pubkey,
-    current_epoch: u64,
-    stake_pool: Keyed<&Account>,
-    validator_list_entries: &[ValidatorStakeInfo],
+    UpdatePoolIfNeededArgs {
+        rpc,
+        send_mode,
+        payer,
+        program_id,
+        current_epoch,
+        stake_pool,
+        validator_list_entries,
+        fee_limit_cu,
+    }: UpdatePoolIfNeededArgs<'_>,
 ) {
     let sp = StakePool::deserialize(&mut stake_pool.account.data.as_slice()).unwrap();
     if sp.last_update_epoch >= current_epoch {
@@ -44,7 +58,7 @@ pub async fn update_pool_if_needed(
             continue;
         }
         let start_index = i * MAX_VALIDATORS_TO_UPDATE_PER_TX;
-        let ix = uvlb
+        let ixs = vec![uvlb
             .full_ix_from_validator_slice(
                 program_id,
                 chunk,
@@ -53,15 +67,22 @@ pub async fn update_pool_if_needed(
                     no_merge: false,
                 },
             )
-            .unwrap();
+            .unwrap()];
+        let ixs = match send_mode {
+            TxSendMode::DumpMsg => ixs,
+            _ => with_auto_cb_ixs(rpc, &payer.pubkey(), ixs, &[], fee_limit_cu).await,
+        };
         eprintln!(
             "Updating validator list [{}..{}]",
             start_index,
-            start_index + MAX_VALIDATORS_TO_UPDATE_PER_TX
+            std::cmp::min(
+                start_index + MAX_VALIDATORS_TO_UPDATE_PER_TX,
+                validator_list_entries.len()
+            )
         );
-        handle_tx_full(rpc, send_mode, &[ix], &[], &mut [payer]).await;
+        handle_tx_full(rpc, send_mode, &ixs, &[], &mut [payer]).await;
     }
-    let final_ixs = [
+    let final_ixs = vec![
         update_stake_pool_balance_ix_with_program_id(
             program_id,
             UpdateStakePoolBalance { stake_pool }
@@ -77,6 +98,10 @@ pub async fn update_pool_if_needed(
         )
         .unwrap(),
     ];
+    let final_ixs = match send_mode {
+        TxSendMode::DumpMsg => final_ixs,
+        _ => with_auto_cb_ixs(rpc, &payer.pubkey(), final_ixs, &[], fee_limit_cu).await,
+    };
     eprintln!("Sending final update tx");
     handle_tx_full(rpc, send_mode, &final_ixs, &[], &mut [payer]).await;
 }

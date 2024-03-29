@@ -50,7 +50,7 @@ impl ListArgs {
                 &mut fetched_validator_list_data.as_ref(),
             )
             .unwrap();
-            display.set_validator_list(&decoded_validator_list);
+            display.set_validator_list(&args.program, &pool, &decoded_validator_list);
         }
 
         println!("{}", ConfigFileTomlOutput { pool: &display })

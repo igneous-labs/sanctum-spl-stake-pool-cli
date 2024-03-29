@@ -16,7 +16,7 @@ use crate::{
         handle_tx_full, with_auto_cb_ixs, MAX_ADD_VALIDATORS_IX_PER_TX,
         MAX_REMOVE_VALIDATOR_IXS_ENUM_PER_TX,
     },
-    update::update_pool_if_needed,
+    update::{update_pool_if_needed, UpdatePoolIfNeededArgs},
 };
 
 use super::Subcmd;
@@ -71,18 +71,19 @@ impl SyncValidatorListArgs {
         let EpochInfo { epoch, .. } = rpc.get_epoch_info().await.unwrap();
 
         // need to update first to be able to add/remove validators
-        update_pool_if_needed(
-            &rpc,
-            args.send_mode,
-            payer.as_ref(),
-            args.program,
-            epoch,
-            Keyed {
+        update_pool_if_needed(UpdatePoolIfNeededArgs {
+            rpc: &rpc,
+            send_mode: args.send_mode,
+            payer: payer.as_ref(),
+            program_id: args.program,
+            current_epoch: epoch,
+            stake_pool: Keyed {
                 pubkey: pool,
                 account: &stake_pool_acc,
             },
-            &old_validators,
-        )
+            validator_list_entries: &old_validators,
+            fee_limit_cu: args.fee_limit_cu,
+        })
         .await;
 
         let svlc = SyncValidatorListConfig {

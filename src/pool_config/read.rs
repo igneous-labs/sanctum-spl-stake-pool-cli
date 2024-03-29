@@ -1,10 +1,10 @@
 //! For updating Config with pool data read from onchain
 
-use sanctum_spl_stake_pool_lib::FindDepositAuthority;
+use sanctum_spl_stake_pool_lib::{FindDepositAuthority, FindWithdrawAuthority};
 use solana_sdk::pubkey::Pubkey;
 use spl_stake_pool_interface::{StakePool, ValidatorList, ValidatorListHeader};
 
-use super::ConfigFileRaw;
+use super::{ConfigFileRaw, ValidatorConfigRaw};
 
 impl ConfigFileRaw {
     pub fn set_pool_pk(&mut self, pool_pk: Pubkey) {
@@ -58,6 +58,12 @@ impl ConfigFileRaw {
         } else {
             None
         };
+        self.stake_withdraw_auth = Some(
+            FindWithdrawAuthority { pool }
+                .run_for_prog(program_id)
+                .0
+                .to_string(),
+        );
         self.sol_withdraw_auth = sol_withdraw_authority.map(|s| s.to_string());
         self.preferred_deposit_validator =
             preferred_deposit_validator_vote_address.map(|pk| pk.to_string());
@@ -82,12 +88,19 @@ impl ConfigFileRaw {
 
     pub fn set_validator_list(
         &mut self,
+        program_id: &Pubkey,
+        pool: &Pubkey,
         ValidatorList {
             header: ValidatorListHeader { max_validators, .. },
             validators,
         }: &ValidatorList,
     ) {
         self.max_validators = Some(*max_validators);
-        self.validators = Some(validators.iter().map(Into::into).collect())
+        self.validators = Some(
+            validators
+                .iter()
+                .map(|vsi| ValidatorConfigRaw::from_vsi_program_pool(vsi, program_id, pool))
+                .collect(),
+        )
     }
 }

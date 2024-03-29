@@ -9,7 +9,7 @@ use solana_readonly_account::keyed::Keyed;
 use solana_sdk::{epoch_info::EpochInfo, pubkey::Pubkey};
 use spl_stake_pool_interface::{StakePool, ValidatorList};
 
-use crate::update::update_pool_if_needed;
+use crate::update::{update_pool_if_needed, UpdatePoolIfNeededArgs};
 
 use super::Subcmd;
 
@@ -41,18 +41,19 @@ impl UpdateArgs {
 
         let EpochInfo { epoch, .. } = rpc.get_epoch_info().await.unwrap();
 
-        update_pool_if_needed(
-            &rpc,
-            args.send_mode,
-            payer.as_ref(),
-            args.program,
-            epoch,
-            Keyed {
+        update_pool_if_needed(UpdatePoolIfNeededArgs {
+            rpc: &rpc,
+            send_mode: args.send_mode,
+            payer: payer.as_ref(),
+            program_id: args.program,
+            current_epoch: epoch,
+            stake_pool: Keyed {
                 pubkey: pool,
                 account: &stake_pool_acc,
             },
-            &validators,
-        )
+            validator_list_entries: &validators,
+            fee_limit_cu: args.fee_limit_cu,
+        })
         .await;
     }
 }
