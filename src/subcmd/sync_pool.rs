@@ -58,7 +58,7 @@ impl SyncPoolArgs {
         let curr_manager = old_manager
             .as_ref()
             .or(manager.as_ref())
-            .map(|s| parse_signer(s).unwrap());
+            .map_or_else(|| None, |s| parse_signer(s).ok()); // if old-manager is not a valid signer, treat it as None and fall back to payer
         let curr_manager = curr_manager
             .as_ref()
             .map_or_else(|| payer.as_ref(), |c| c.as_ref());
@@ -69,7 +69,9 @@ impl SyncPoolArgs {
                 curr_manager.pubkey()
             );
         }
-        let new_manager = manager.as_ref().map(|s| parse_signer(s).unwrap());
+        let new_manager = manager
+            .as_ref()
+            .map_or_else(|| None, |s| parse_signer(s).ok()); // if manager is not a valid signer, treat it as None and fall back to current manager
         let new_manager = new_manager
             .as_ref()
             .map_or_else(|| curr_manager, |n| n.as_ref());
@@ -93,7 +95,7 @@ impl SyncPoolArgs {
             (sol_deposit_referral_fee, stake_pool.sol_referral_fee),
             (stake_deposit_referral_fee, stake_pool.stake_referral_fee),
         ]
-        .map(|(file_opt, stake_pool_val)| file_opt.unwrap_or(stake_pool_val));
+        .map(|(opt, stake_pool_val)| opt.unwrap_or(stake_pool_val));
 
         let [epoch_fee, stake_withdrawal_fee, sol_withdrawal_fee, stake_deposit_fee, sol_deposit_fee] =
             [
@@ -103,7 +105,7 @@ impl SyncPoolArgs {
                 (stake_deposit_fee, &stake_pool.stake_deposit_fee),
                 (sol_deposit_fee, &stake_pool.sol_deposit_fee),
             ]
-            .map(|(file_opt, stake_pool_val)| file_opt.unwrap_or(stake_pool_val.clone()));
+            .map(|(opt, stake_pool_val)| opt.unwrap_or(stake_pool_val.clone()));
 
         let spc = SyncPoolConfig {
             program_id: args.program,

@@ -14,6 +14,7 @@ mod pool_config;
 mod sorted_signers;
 mod subcmd;
 mod tx_utils;
+mod update;
 mod utils;
 
 #[cfg(test)]
