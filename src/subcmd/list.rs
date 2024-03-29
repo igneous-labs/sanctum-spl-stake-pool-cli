@@ -36,9 +36,15 @@ impl ListArgs {
         let mut display = ConfigFileRaw::default();
         display.set_pool_pk(pool);
 
-        let fetched_pool_data = rpc.get_account_data(&pool).await.unwrap();
+        let fetched_pool = rpc.get_account(&pool).await.unwrap();
+        if args.program != fetched_pool.owner {
+            panic!(
+                "Wrong stake pool program. Expected {}, but stake pool's is {}",
+                args.program, fetched_pool.owner
+            )
+        }
         let decoded_pool =
-            <StakePool as borsh::BorshDeserialize>::deserialize(&mut fetched_pool_data.as_ref())
+            <StakePool as borsh::BorshDeserialize>::deserialize(&mut fetched_pool.data.as_ref())
                 .unwrap();
         let validator_list_pk = decoded_pool.validator_list;
         display.set_pool(&args.program, pool, &decoded_pool);
