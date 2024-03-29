@@ -113,8 +113,11 @@ mod tests {
             validator_list: Pubkey::new_unique(),
             reserve: Pubkey::new_unique(),
             validators,
+            // dont care
+            preferred_deposit_validator: None,
+            preferred_withdraw_validator: None,
         };
-        let (add, _remove) = svlc.changeset(&[]);
+        let (add, _remove) = svlc.add_remove_changeset(&[]);
         let ixs = svlc.add_validators_ixs(add).unwrap();
         let mut iter = ixs.as_slice().chunks(MAX_ADD_VALIDATORS_IX_PER_TX);
         let add_validator_ix_chunk = iter.next().unwrap();

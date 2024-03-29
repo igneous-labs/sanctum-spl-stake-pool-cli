@@ -53,6 +53,8 @@ impl CreatePoolArgs {
             sol_deposit_auth,
             sol_withdraw_auth,
             validators,
+            preferred_deposit_validator,
+            preferred_withdraw_validator,
             ..
         } = ConfigFileRaw::read_from_path(pool_config).unwrap();
 
@@ -113,20 +115,31 @@ impl CreatePoolArgs {
 
         // initialize sets sol/stake fee to the same number
         // use the higher value of the two to avoid per-epoch max withdrawal fee increase limits
-        let epoch_fee = epoch_fee.unwrap_or(ZERO_FEE);
-        let stake_deposit_referral_fee = stake_deposit_referral_fee.unwrap_or(0);
-        let sol_deposit_referral_fee = sol_deposit_referral_fee.unwrap_or(0);
+        let [stake_deposit_referral_fee, sol_deposit_referral_fee] =
+            [stake_deposit_referral_fee, sol_deposit_referral_fee]
+                .map(|ref_fee| ref_fee.unwrap_or(0));
         let deposit_referral_fee = if stake_deposit_referral_fee > sol_deposit_referral_fee {
             stake_deposit_referral_fee
         } else {
             sol_deposit_referral_fee
         };
-        let stake_deposit_fee = stake_deposit_fee.unwrap_or(ZERO_FEE);
-        let sol_deposit_fee = sol_deposit_fee.unwrap_or(ZERO_FEE);
-        let deposit_fee = select_higher_fee(&stake_deposit_fee, &sol_deposit_fee);
-        let stake_withdrawal_fee = stake_withdrawal_fee.unwrap_or(ZERO_FEE);
-        let sol_withdrawal_fee = sol_withdrawal_fee.unwrap_or(ZERO_FEE);
-        let withdrawal_fee = select_higher_fee(&stake_withdrawal_fee, &sol_withdrawal_fee);
+
+        let [epoch_fee, stake_deposit_fee, sol_deposit_fee, stake_withdrawal_fee, sol_withdrawal_fee] =
+            [
+                epoch_fee,
+                stake_deposit_fee,
+                sol_deposit_fee,
+                stake_withdrawal_fee,
+                sol_withdrawal_fee,
+            ]
+            .map(|fee| fee.unwrap_or(ZERO_FEE));
+
+        let [deposit_fee, withdrawal_fee] = [
+            (&stake_deposit_fee, &sol_deposit_fee),
+            (&stake_withdrawal_fee, &sol_withdrawal_fee),
+        ]
+        .map(|(f1, f2)| select_higher_fee(f1, f2));
+
         let staker = staker.map(|s| parse_signer(&s).unwrap());
         let staker = staker.as_ref().map_or_else(|| manager, |s| s.as_ref());
         let stake_deposit_auth = stake_deposit_auth.map_or_else(
@@ -138,8 +151,15 @@ impl CreatePoolArgs {
                 )
             },
         );
-        let sol_deposit_auth = sol_deposit_auth.map(|s| parse_pubkey_src(&s).unwrap().pubkey());
-        let sol_withdraw_auth = sol_withdraw_auth.map(|s| parse_pubkey_src(&s).unwrap().pubkey());
+
+        let [sol_deposit_auth, sol_withdraw_auth, preferred_deposit_validator, preferred_withdraw_validator] =
+            [
+                sol_deposit_auth,
+                sol_withdraw_auth,
+                preferred_deposit_validator,
+                preferred_withdraw_validator,
+            ]
+            .map(|opt| opt.map(|s| parse_pubkey_src(&s).unwrap().pubkey()));
 
         let cc = CreateConfig {
             mint: Keyed {
@@ -244,9 +264,9 @@ impl CreatePoolArgs {
             sol_withdraw_authority: None,
             sol_withdrawal_fee: cc.withdrawal_fee.clone(),
             next_sol_withdrawal_fee: FutureEpochFee::None,
-            // dont cares:
             preferred_deposit_validator_vote_address: None,
             preferred_withdraw_validator_vote_address: None,
+            // dont cares:
             lockup: Lockup {
                 unix_timestamp: 0,
                 epoch: 0,
@@ -309,13 +329,16 @@ impl CreatePoolArgs {
             pool: pool.pubkey(),
             validator_list: validator_list.pubkey(),
             reserve: reserve.pubkey(),
+            preferred_deposit_validator,
+            preferred_withdraw_validator,
             validators: validators
                 .into_iter()
                 .map(|v| Pubkey::from_str(&v.vote).unwrap())
                 .collect(),
         };
+
         // starting validator list is empty
-        let (add, _remove) = svlc.changeset(&[]);
+        let (add, _remove) = svlc.add_remove_changeset(&[]);
         eprint!("Adding validators: ");
         for to_add in add.clone() {
             eprint!("{to_add}, ");
@@ -350,6 +373,39 @@ impl CreatePoolArgs {
             )
             .await;
         }
+
+        // finally, set preferred validators since
+        // we can only set preferred validators after adding the validators to the list
+        let preferred_validator_changes = svlc.preferred_validator_changeset(&dummy_created_pool);
+        for change in preferred_validator_changes.clone() {
+            eprintln!("{change}");
+        }
+        let preferred_validator_ixs = svlc
+            .preferred_validator_ixs(preferred_validator_changes)
+            .unwrap();
+        if !preferred_validator_ixs.is_empty() {
+            let preferred_validator_ixs = match args.send_mode {
+                TxSendMode::DumpMsg => preferred_validator_ixs,
+                _ => {
+                    with_auto_cb_ixs(
+                        &rpc,
+                        &payer.pubkey(),
+                        preferred_validator_ixs,
+                        &[],
+                        args.fee_limit_cu,
+                    )
+                    .await
+                }
+            };
+            handle_tx_full(
+                &rpc,
+                args.send_mode,
+                &preferred_validator_ixs,
+                &[],
+                &mut svlc.signers_maybe_dup(),
+            )
+            .await;
+        }
     }
 }
 
@@ -376,9 +432,9 @@ fn verify_mint(mint: &Account, manager_pk: &Pubkey) -> Result<(), Box<dyn Error>
     Ok(())
 }
 
-fn select_higher_fee(s1: &Fee, s2: &Fee) -> Fee {
-    match CmpFee(s1).cmp(&CmpFee(s2)) {
-        Ordering::Less | Ordering::Equal => s2.clone(),
-        Ordering::Greater => s1.clone(),
+fn select_higher_fee(f1: &Fee, f2: &Fee) -> Fee {
+    match CmpFee(f1).cmp(&CmpFee(f2)) {
+        Ordering::Less | Ordering::Equal => f2.clone(),
+        Ordering::Greater => f1.clone(),
     }
 }

@@ -110,6 +110,14 @@ async fn init_basic_manager_payer_same() {
     );
     assert_eq!(stake_pool.stake_referral_fee, 50);
     assert_eq!(stake_pool.sol_referral_fee, 0);
+    assert_eq!(
+        stake_pool.preferred_deposit_validator_vote_address,
+        Some(shinobi_vote::ID)
+    );
+    assert_eq!(
+        stake_pool.preferred_withdraw_validator_vote_address,
+        Some(zeta_vote::ID)
+    );
 
     let ValidatorList {
         header: ValidatorListHeader { max_validators, .. },
