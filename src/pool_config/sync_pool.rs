@@ -95,44 +95,47 @@ impl SyncPoolChange {
 
     fn old_val_display(&self) -> String {
         match self {
-            Self::Fee { old, .. } => match old {
-                FeeType::SolReferral { fee } | FeeType::StakeReferral { fee } => format!("{fee}%"),
-                FeeType::Epoch { fee }
-                | FeeType::SolDeposit { fee }
-                | FeeType::SolWithdrawal { fee }
-                | FeeType::StakeDeposit { fee }
-                | FeeType::StakeWithdrawal { fee } => {
-                    format!("{}/{}", fee.numerator, fee.denominator)
-                }
-            },
+            Self::Fee { old, .. } => self.fee_type_display(old),
             Self::ManagerFeeAccount { old, .. }
             | Self::Staker { old, .. }
-            | Self::Manager { old, .. } => old.to_string(),
-            Self::FundingAuth { old, .. } => {
-                old.map_or_else(|| "None".to_owned(), |pk| pk.to_string())
-            }
+            | Self::Manager { old, .. } => self.pubkey_display(old),
+            Self::FundingAuth { old, .. } => self.pubkey_opt_display(old),
         }
     }
 
     fn new_val_display(&self) -> String {
         match self {
-            Self::Fee { new, .. } => match new {
-                FeeType::SolReferral { fee } | FeeType::StakeReferral { fee } => format!("{fee}%"),
-                FeeType::Epoch { fee }
-                | FeeType::SolDeposit { fee }
-                | FeeType::SolWithdrawal { fee }
-                | FeeType::StakeDeposit { fee }
-                | FeeType::StakeWithdrawal { fee } => {
+            Self::Fee { new, .. } => self.fee_type_display(new),
+            Self::ManagerFeeAccount { new, .. }
+            | Self::Staker { new, .. }
+            | Self::Manager { new, .. } => self.pubkey_display(new),
+            Self::FundingAuth { new, .. } => self.pubkey_opt_display(new),
+        }
+    }
+
+    fn fee_type_display(&self, fee_type: &FeeType) -> String {
+        match fee_type {
+            FeeType::SolReferral { fee } | FeeType::StakeReferral { fee } => format!("{fee}%"),
+            FeeType::Epoch { fee }
+            | FeeType::SolDeposit { fee }
+            | FeeType::SolWithdrawal { fee }
+            | FeeType::StakeDeposit { fee }
+            | FeeType::StakeWithdrawal { fee } => {
+                if CmpFee(fee).is_zero() {
+                    "0".to_owned()
+                } else {
                     format!("{}/{}", fee.numerator, fee.denominator)
                 }
-            },
-            Self::ManagerFeeAccount { new, .. } => new.to_string(),
-            Self::Staker { new, .. } => new.to_string(),
-            Self::Manager { new, .. } => new.to_string(),
-            Self::FundingAuth { new, .. } => {
-                new.map_or_else(|| "None".to_owned(), |pk| pk.to_string())
             }
         }
+    }
+
+    fn pubkey_opt_display(&self, pubkey_opt: &Option<Pubkey>) -> String {
+        pubkey_opt.map_or_else(|| "None".to_owned(), |pk| pk.to_string())
+    }
+
+    fn pubkey_display(&self, pubkey: &Pubkey) -> String {
+        pubkey.to_string()
     }
 }
 

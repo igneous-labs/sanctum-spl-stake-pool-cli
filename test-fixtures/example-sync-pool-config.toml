@@ -1,0 +1,39 @@
+[pool]
+mint = "EBm88rgvrZZeD2Rq1rEiXqT36VdK2ew1XYitn7Cji8Lc"
+
+# random keypair generation is not allowed to allow users to recover in event of init failure
+pool = "./test-fixtures/example-pool-keypair.json"
+
+old-manager = "./test-fixtures/example-manager-keypair.json" # defaults to config wallet if not specified
+manager = "./test-fixtures/example-new-manager-keypair.json" # no change if not specified
+# manager-fee-account = "4USVEavVayF32is9pz2oYWn6Vv77rTtMHUhvP5MBgXo2" # no change if not specified
+# staker = "DAgQZufbVTGvJkDd3FhtcLPcmWXX7h5jzcePyVKCWZoL" # no change if not specified
+
+# stake-deposit-auth = "DAgQZufbVTGvJkDd3FhtcLPcmWXX7h5jzcePyVKCWZoL" # sets to None if not specified
+# sol-deposit-auth = "DUMMYSo1DEPoS1TAUTH1111111111111111111111111" # sets to None if not specified
+sol-withdraw-auth = "DUMMYSo1W1THDRAWAUTH11111111111111111111111" # sets to None if not specified
+
+# All fee values below trigger no change if not specified
+
+# stake-deposit-referral-fee = 50 
+sol-deposit-referral-fee = 0
+
+[pool.epoch-fee]
+denominator = 100
+numerator = 6
+
+[pool.stake-withdrawal-fee]
+denominator = 1000
+numerator = 1
+
+[pool.sol-withdrawal-fee]
+denominator = 0
+numerator = 0
+
+[pool.stake-deposit-fee]
+denominator = 0
+numerator = 0
+
+[pool.sol-deposit-fee]
+denominator = 1000 
+numerator = 1

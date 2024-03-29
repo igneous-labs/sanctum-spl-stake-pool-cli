@@ -39,8 +39,8 @@ pub struct ConfigFileRaw {
     pub next_sol_withdrawal_fee: Option<FutureEpochFee>,
     pub last_epoch_pool_token_supply: Option<u64>,
     pub last_epoch_total_lamports: Option<u64>,
-    // put this last so it gets outputted last in toml Serialize
-    pub validators: Option<Vec<ValidatorConfigRaw>>,
+    pub old_manager: Option<String>, // only present for sync-pool
+    pub validators: Option<Vec<ValidatorConfigRaw>>, // put this last so it gets outputted last in toml Serialize
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
