@@ -9,7 +9,15 @@ use solana_sdk::pubkey::Pubkey;
 use subcmd::Subcmd;
 use tokio::runtime::Runtime;
 
+mod luts;
+mod pool_config;
+mod sorted_signers;
 mod subcmd;
+mod tx_utils;
+mod utils;
+
+#[cfg(test)]
+mod test_utils;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about = "Sanctum SPL Stake Pool CLI")]
@@ -44,7 +52,7 @@ Any positive integer: enable dynamic CU calculation
 This arg is the max priority fee the user will pay per transaction in lamports.",
         default_value_t = 1
     )]
-    pub cu_fee_limit: u64,
+    pub fee_limit_cu: u64,
 
     #[arg(
         long,
