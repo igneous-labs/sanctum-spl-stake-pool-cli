@@ -1,4 +1,4 @@
-use std::{collections::HashSet, num::NonZeroU32};
+use std::{collections::HashSet, fmt::Display, num::NonZeroU32};
 
 use sanctum_spl_stake_pool_lib::{
     FindEphemeralStakeAccount, FindEphemeralStakeAccountArgs, FindTransientStakeAccount,
@@ -11,10 +11,14 @@ use solana_sdk::{
 use spl_stake_pool_interface::{
     add_validator_to_pool_ix_with_program_id,
     decrease_additional_validator_stake_ix_with_program_id,
-    remove_validator_from_pool_ix_with_program_id, AddValidatorToPoolIxArgs,
-    AddValidatorToPoolKeys, AdditionalValidatorStakeArgs, DecreaseAdditionalValidatorStakeIxArgs,
-    DecreaseAdditionalValidatorStakeKeys, RemoveValidatorFromPoolKeys, ValidatorStakeInfo,
+    remove_validator_from_pool_ix_with_program_id, set_preferred_validator_ix_with_program_id,
+    AddValidatorToPoolIxArgs, AddValidatorToPoolKeys, AdditionalValidatorStakeArgs,
+    DecreaseAdditionalValidatorStakeIxArgs, DecreaseAdditionalValidatorStakeKeys,
+    PreferredValidatorType, RemoveValidatorFromPoolKeys, SetPreferredValidatorIxArgs,
+    SetPreferredValidatorKeys, StakePool, ValidatorStakeInfo,
 };
+
+use crate::pool_config::utils::pubkey_opt_display;
 
 /// All generated ixs must be signed by staker only.
 /// Adds and removes validators from the list to match `self.validators`
@@ -28,6 +32,30 @@ pub struct SyncValidatorListConfig<'a> {
     pub validator_list: Pubkey,
     pub reserve: Pubkey,
     pub validators: HashSet<Pubkey>,
+    pub preferred_deposit_validator: Option<Pubkey>,
+    pub preferred_withdraw_validator: Option<Pubkey>,
+}
+
+#[derive(Clone, Debug)]
+pub struct PreferredValidatorChange {
+    pub ty: PreferredValidatorType,
+    pub old: Option<Pubkey>,
+    pub new: Option<Pubkey>,
+}
+
+impl Display for PreferredValidatorChange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let attr = match self.ty {
+            PreferredValidatorType::Deposit => "deposit",
+            PreferredValidatorType::Withdraw => "withdraw",
+        };
+        write!(
+            f,
+            "Change preferred {attr} validator from {} to {}",
+            pubkey_opt_display(&self.old),
+            pubkey_opt_display(&self.new)
+        )
+    }
 }
 
 impl<'a> SyncValidatorListConfig<'a> {
@@ -35,8 +63,73 @@ impl<'a> SyncValidatorListConfig<'a> {
         [self.payer, self.staker]
     }
 
+    fn withdraw_auth(&self) -> Pubkey {
+        FindWithdrawAuthority { pool: self.pool }
+            .run_for_prog(&self.program_id)
+            .0
+    }
+}
+
+// set preferred validators
+impl<'a> SyncValidatorListConfig<'a> {
+    pub fn preferred_validator_changeset(
+        &self,
+        stake_pool: &StakePool,
+    ) -> impl Iterator<Item = PreferredValidatorChange> + Clone {
+        [
+            (
+                self.preferred_deposit_validator,
+                stake_pool.preferred_deposit_validator_vote_address,
+                PreferredValidatorType::Deposit,
+            ),
+            (
+                self.preferred_withdraw_validator,
+                stake_pool.preferred_withdraw_validator_vote_address,
+                PreferredValidatorType::Withdraw,
+            ),
+        ]
+        .into_iter()
+        .filter_map(|(new, old, ty)| {
+            if new != old {
+                Some(PreferredValidatorChange { ty, new, old })
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn preferred_validator_ixs(
+        &self,
+        changes: impl Iterator<Item = PreferredValidatorChange>,
+    ) -> std::io::Result<Vec<Instruction>> {
+        changes
+            .map(|c| self.set_preferred_validator_ix(c))
+            .collect()
+    }
+
+    fn set_preferred_validator_ix(
+        &self,
+        PreferredValidatorChange { ty, new, .. }: PreferredValidatorChange,
+    ) -> std::io::Result<Instruction> {
+        set_preferred_validator_ix_with_program_id(
+            self.program_id,
+            SetPreferredValidatorKeys {
+                stake_pool: self.pool,
+                staker: self.staker.pubkey(),
+                validator_list: self.validator_list,
+            },
+            SetPreferredValidatorIxArgs {
+                validator_type: ty,
+                validator_vote_address: new,
+            },
+        )
+    }
+}
+
+// add/remove validators
+impl<'a> SyncValidatorListConfig<'a> {
     /// Returns (add, remove)
-    pub fn changeset<'me>(
+    pub fn add_remove_changeset<'me>(
         &'me self,
         validator_list: &'me [ValidatorStakeInfo],
     ) -> (
@@ -181,12 +274,6 @@ impl<'a> SyncValidatorListConfig<'a> {
         } else {
             RemoveValidatorIxs::RemoveDirectly(remove_ix)
         })
-    }
-
-    fn withdraw_auth(&self) -> Pubkey {
-        FindWithdrawAuthority { pool: self.pool }
-            .run_for_prog(&self.program_id)
-            .0
     }
 }
 

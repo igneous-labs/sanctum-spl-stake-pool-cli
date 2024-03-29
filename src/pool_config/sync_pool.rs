@@ -11,6 +11,8 @@ use spl_stake_pool_interface::{
 
 use crate::utils::filter_default_stake_deposit_auth;
 
+use super::utils::pubkey_opt_display;
+
 /// All generated ixs must be signed by manager only
 #[derive(Debug)]
 pub struct SyncPoolConfig<'a> {
@@ -98,8 +100,8 @@ impl SyncPoolChange {
             Self::Fee { old, .. } => self.fee_type_display(old),
             Self::ManagerFeeAccount { old, .. }
             | Self::Staker { old, .. }
-            | Self::Manager { old, .. } => self.pubkey_display(old),
-            Self::FundingAuth { old, .. } => self.pubkey_opt_display(old),
+            | Self::Manager { old, .. } => old.to_string(),
+            Self::FundingAuth { old, .. } => pubkey_opt_display(old),
         }
     }
 
@@ -108,8 +110,8 @@ impl SyncPoolChange {
             Self::Fee { new, .. } => self.fee_type_display(new),
             Self::ManagerFeeAccount { new, .. }
             | Self::Staker { new, .. }
-            | Self::Manager { new, .. } => self.pubkey_display(new),
-            Self::FundingAuth { new, .. } => self.pubkey_opt_display(new),
+            | Self::Manager { new, .. } => new.to_string(),
+            Self::FundingAuth { new, .. } => pubkey_opt_display(new),
         }
     }
 
@@ -128,14 +130,6 @@ impl SyncPoolChange {
                 }
             }
         }
-    }
-
-    fn pubkey_opt_display(&self, pubkey_opt: &Option<Pubkey>) -> String {
-        pubkey_opt.map_or_else(|| "None".to_owned(), |pk| pk.to_string())
-    }
-
-    fn pubkey_display(&self, pubkey: &Pubkey) -> String {
-        pubkey.to_string()
     }
 }
 
