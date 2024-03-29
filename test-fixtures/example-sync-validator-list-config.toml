@@ -1,0 +1,12 @@
+[pool]
+staker = "./test-fixtures/example-manager-keypair.json" # defaults to config wallet if not specified
+
+# preferred-deposit-validator = "BLADE1qNA1uNjRgER6DtUFf7FU3c1TWLLdpPeEcKatZ2" # sets to None if not specified
+# preferred-withdraw-validator = "FnAPJkzf19s87sm24Qhv6bHZMZvZ43gjNUBRgjwXpD4v" # sets to None if not specified
+
+[[pool.validators]]
+vote = "FnAPJkzf19s87sm24Qhv6bHZMZvZ43gjNUBRgjwXpD4v"
+
+# any omitted validators are removed from the list if they're present on the list onchain
+#[[pool.validators]]
+#vote = "BLADE1qNA1uNjRgER6DtUFf7FU3c1TWLLdpPeEcKatZ2"

@@ -185,7 +185,6 @@ impl<'a> SyncValidatorListConfig<'a> {
         )
     }
 
-    #[allow(unused)] // TODO: remove
     pub fn remove_validators_ixs<'b>(
         &self,
         remove: impl Iterator<Item = &'b ValidatorStakeInfo>,
@@ -292,4 +291,20 @@ impl RemoveValidatorIxs {
             Self::RemoveDirectly(i) => [Some(i), None].into_iter().filter_map(fm),
         }
     }
+}
+
+pub fn print_removing_validators_msg<'a>(remove: impl Iterator<Item = &'a ValidatorStakeInfo>) {
+    eprint!("Removing validators: ");
+    for to_remove in remove {
+        eprint!("{}, ", to_remove.vote_account_address);
+    }
+    eprintln!();
+}
+
+pub fn print_adding_validators_msg<'a>(add: impl Iterator<Item = &'a Pubkey>) {
+    eprint!("Adding validators: ");
+    for to_add in add {
+        eprint!("{to_add}, ");
+    }
+    eprintln!();
 }
