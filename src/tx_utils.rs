@@ -32,6 +32,9 @@ pub async fn with_auto_cb_ixs(
     luts: &[AddressLookupTableAccount],
     fee_limit_cu_lamports: u64,
 ) -> Vec<Instruction> {
+    if fee_limit_cu_lamports == 0 {
+        return ixs;
+    }
     let message =
         VersionedMessage::V0(Message::try_compile(payer_pk, &ixs, luts, Hash::default()).unwrap());
     let tx_to_sim = VersionedTransaction {
