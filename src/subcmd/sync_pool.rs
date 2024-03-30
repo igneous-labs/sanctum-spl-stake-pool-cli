@@ -48,6 +48,7 @@ impl SyncPoolArgs {
 
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();
+        let program_id = args.program.program_id();
 
         let pool = Pubkey::from_str(pool.as_ref().unwrap()).unwrap();
 
@@ -108,7 +109,7 @@ impl SyncPoolArgs {
             .map(|(opt, stake_pool_val)| opt.unwrap_or(stake_pool_val.clone()));
 
         let spc = SyncPoolConfig {
-            program_id: args.program,
+            program_id,
             pool,
             payer: payer.as_ref(),
             manager: curr_manager,
@@ -135,7 +136,7 @@ impl SyncPoolArgs {
         let sync_pool_ixs = match args.send_mode {
             TxSendMode::DumpMsg => sync_pool_ixs,
             _ => {
-                with_auto_cb_ixs(&rpc, &payer.pubkey(), sync_pool_ixs, &[], args.fee_limit_cu).await
+                with_auto_cb_ixs(&rpc, &payer.pubkey(), sync_pool_ixs, &[], args.fee_limit_cb).await
             }
         };
         handle_tx_full(

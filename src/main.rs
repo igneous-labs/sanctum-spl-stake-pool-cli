@@ -1,21 +1,16 @@
-use std::str::FromStr;
-
-use clap::{
-    builder::{StringValueParser, TypedValueParser, ValueParser},
-    Parser,
-};
+use clap::{builder::ValueParser, Parser};
+use parse::SplStakePoolProgram;
 use sanctum_solana_cli_utils::{ConfigWrapper, TxSendMode};
-use solana_sdk::pubkey::Pubkey;
 use subcmd::Subcmd;
 use tokio::runtime::Runtime;
 
 mod luts;
+mod parse;
 mod pool_config;
 mod sorted_signers;
 mod subcmd;
 mod tx_utils;
 mod update;
-mod utils;
 
 #[cfg(test)]
 mod test_utils;
@@ -38,7 +33,8 @@ pub struct Args {
         help = "Transaction send mode.
 - send-actual: signs and sends the tx to the cluster specified in config and outputs hash to stderr
 - sim-only: simulates the tx against the cluster and outputs logs to stderr
-- dump-msg: dumps the base64 encoded tx to stdout. For use with inspectors and multisigs",
+- dump-msg: dumps the base64 encoded tx to stdout. For use with inspectors and multisigs
+",
         default_value_t = TxSendMode::default(),
         value_enum,
     )]
@@ -48,21 +44,22 @@ pub struct Args {
         long,
         short,
         help = "0 - disable ComputeBudgetInstruction prepending.
-Any positive integer: enable dynamic CU calculation
-- before sending a TX, simulate the tx and prepend with appropriate ComputeBudgetInstructions.
-This arg is the max priority fee the user will pay per transaction in lamports.",
+Any positive integer - enable dynamic compute budget calculation:
+Before sending a TX, simulate the tx and prepend with appropriate ComputeBudgetInstructions.
+This arg is the max priority fee the user will pay per transaction in lamports.
+",
         default_value_t = 1
     )]
-    pub fee_limit_cu: u64,
+    pub fee_limit_cb: u64,
 
     #[arg(
         long,
         short,
-        help = "program ID of the SPL stake pool program",
-        default_value_t = spl_stake_pool_interface::ID,
-        value_parser = StringValueParser::new().try_map(|s| Pubkey::from_str(&s)),
+        help = SplStakePoolProgram::HELP_STR,
+        default_value_t = SplStakePoolProgram::Spl,
+        value_parser = ValueParser::new(SplStakePoolProgram::parse),
     )]
-    pub program: Pubkey,
+    pub program: SplStakePoolProgram,
 
     #[command(subcommand)]
     pub subcmd: Subcmd,

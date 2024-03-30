@@ -32,6 +32,7 @@ impl UpdateArgs {
 
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();
+        let program_id = args.program.program_id();
 
         let stake_pool_acc = rpc.get_account(&pool).await.unwrap();
         let stake_pool = StakePool::deserialize(&mut stake_pool_acc.data.as_slice()).unwrap();
@@ -45,14 +46,14 @@ impl UpdateArgs {
             rpc: &rpc,
             send_mode: args.send_mode,
             payer: payer.as_ref(),
-            program_id: args.program,
+            program_id,
             current_epoch: epoch,
             stake_pool: Keyed {
                 pubkey: pool,
                 account: &stake_pool_acc,
             },
             validator_list_entries: &validators,
-            fee_limit_cu: args.fee_limit_cu,
+            fee_limit_cb: args.fee_limit_cb,
         })
         .await;
     }

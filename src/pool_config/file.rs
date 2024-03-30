@@ -17,6 +17,7 @@ struct ConfigFileTomlFile {
 #[serde(rename_all = "kebab-case")]
 pub struct ConfigFileRaw {
     pub mint: Option<String>,
+    pub token_program: Option<String>,
     pub pool: Option<String>,
     pub validator_list: Option<String>,
     pub reserve: Option<String>,
@@ -24,6 +25,7 @@ pub struct ConfigFileRaw {
     pub manager_fee_account: Option<String>,
     pub staker: Option<String>,
     pub stake_deposit_auth: Option<String>,
+    pub stake_withdraw_auth: Option<String>, // fixed PDA, only displayed for info purposes
     pub sol_deposit_auth: Option<String>,
     pub sol_withdraw_auth: Option<String>,
     pub preferred_deposit_validator: Option<String>,
@@ -44,8 +46,7 @@ pub struct ConfigFileRaw {
     pub next_sol_withdrawal_fee: Option<FutureEpochFee>,
     pub last_epoch_pool_token_supply: Option<u64>,
     pub last_epoch_total_lamports: Option<u64>,
-    pub stake_withdraw_auth: Option<String>, // fixed PDA, only displayed for info purposes
-    pub old_manager: Option<String>,         // only present for sync-pool
+    pub old_manager: Option<String>, // only present for sync-pool
     pub validators: Option<Vec<ValidatorConfigRaw>>, // put this last so it gets outputted last in toml Serialize
 }
 

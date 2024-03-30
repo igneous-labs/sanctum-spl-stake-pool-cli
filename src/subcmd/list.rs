@@ -32,12 +32,13 @@ impl ListArgs {
 
         let pool = parse_pubkey_src(&pool).unwrap().pubkey();
         let rpc = args.config.nonblocking_rpc_client();
+        let program_id = args.program.program_id();
 
         let mut display = ConfigFileRaw::default();
         display.set_pool_pk(pool);
 
         let fetched_pool = rpc.get_account(&pool).await.unwrap();
-        if args.program != fetched_pool.owner {
+        if program_id != fetched_pool.owner {
             panic!(
                 "Wrong stake pool program. Expected {}, but stake pool's is {}",
                 args.program, fetched_pool.owner
@@ -47,7 +48,7 @@ impl ListArgs {
             <StakePool as borsh::BorshDeserialize>::deserialize(&mut fetched_pool.data.as_ref())
                 .unwrap();
         let validator_list_pk = decoded_pool.validator_list;
-        display.set_pool(&args.program, pool, &decoded_pool);
+        display.set_pool(&program_id, pool, &decoded_pool);
 
         if verbose {
             let fetched_validator_list_data =
@@ -56,7 +57,7 @@ impl ListArgs {
                 &mut fetched_validator_list_data.as_ref(),
             )
             .unwrap();
-            display.set_validator_list(&args.program, &pool, &decoded_validator_list);
+            display.set_validator_list(&program_id, &pool, &decoded_validator_list);
         }
 
         println!("{}", ConfigFileTomlOutput { pool: &display })

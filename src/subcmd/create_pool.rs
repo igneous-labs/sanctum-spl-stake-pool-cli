@@ -13,13 +13,13 @@ use spl_stake_pool_interface::{AccountType, Fee, FutureEpochFee, Lockup, StakePo
 use spl_token_2022::{extension::StateWithExtensions, state::Mint};
 
 use crate::{
+    parse::filter_default_stake_deposit_auth,
     pool_config::{
         print_adding_validators_msg, ConfigFileRaw, CreateConfig, SyncPoolConfig,
         SyncValidatorListConfig,
     },
     subcmd::Subcmd,
     tx_utils::{handle_tx_full, with_auto_cb_ixs, MAX_ADD_VALIDATORS_IX_PER_TX},
-    utils::filter_default_stake_deposit_auth,
 };
 
 #[derive(Args, Debug)]
@@ -63,6 +63,7 @@ impl CreatePoolArgs {
 
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();
+        let program_id = args.program.program_id();
 
         // preprocess fields
         let [pool, validator_list, reserve] =
@@ -114,7 +115,7 @@ impl CreatePoolArgs {
         let (default_stake_deposit_auth, _bump) = FindDepositAuthority {
             pool: pool.pubkey(),
         }
-        .run_for_prog(&args.program);
+        .run_for_prog(&program_id);
 
         // initialize sets sol/stake fee to the same number
         // use the higher value of the two to avoid per-epoch max withdrawal fee increase limits
@@ -169,7 +170,7 @@ impl CreatePoolArgs {
                 pubkey: mint,
                 account: &mint_acc,
             },
-            program_id: args.program,
+            program_id,
             payer: payer.as_ref(),
             pool: pool.as_ref(),
             validator_list: validator_list.as_ref(),
@@ -210,7 +211,7 @@ impl CreatePoolArgs {
         }
         let first_ixs = match args.send_mode {
             TxSendMode::DumpMsg => first_ixs,
-            _ => with_auto_cb_ixs(&rpc, &payer.pubkey(), first_ixs, &[], args.fee_limit_cu).await,
+            _ => with_auto_cb_ixs(&rpc, &payer.pubkey(), first_ixs, &[], args.fee_limit_cb).await,
         };
         handle_tx_full(
             &rpc,
@@ -224,7 +225,7 @@ impl CreatePoolArgs {
         let ixs = Vec::from(cc.initialize_tx_ixs().unwrap());
         let ixs = match args.send_mode {
             TxSendMode::DumpMsg => ixs,
-            _ => with_auto_cb_ixs(&rpc, &payer.pubkey(), ixs, &[], args.fee_limit_cu).await,
+            _ => with_auto_cb_ixs(&rpc, &payer.pubkey(), ixs, &[], args.fee_limit_cb).await,
         };
         handle_tx_full(
             &rpc,
@@ -283,7 +284,7 @@ impl CreatePoolArgs {
             last_epoch_total_lamports: 0,
         };
         let spc = SyncPoolConfig {
-            program_id: args.program,
+            program_id,
             pool: cc.pool.pubkey(),
             payer: cc.payer,
             manager,
@@ -310,7 +311,7 @@ impl CreatePoolArgs {
         let sync_pool_ixs = match args.send_mode {
             TxSendMode::DumpMsg => sync_pool_ixs,
             _ => {
-                with_auto_cb_ixs(&rpc, &payer.pubkey(), sync_pool_ixs, &[], args.fee_limit_cu).await
+                with_auto_cb_ixs(&rpc, &payer.pubkey(), sync_pool_ixs, &[], args.fee_limit_cb).await
             }
         };
         handle_tx_full(
@@ -325,7 +326,7 @@ impl CreatePoolArgs {
         // Setup validator list
 
         let svlc = SyncValidatorListConfig {
-            program_id: args.program,
+            program_id,
             payer: payer.as_ref(),
             staker,
             pool: pool.pubkey(),
@@ -357,7 +358,7 @@ impl CreatePoolArgs {
                         &payer.pubkey(),
                         Vec::from(add_validator_ix_chunk),
                         &[],
-                        args.fee_limit_cu,
+                        args.fee_limit_cb,
                     )
                     .await
                 }
@@ -390,7 +391,7 @@ impl CreatePoolArgs {
                         &payer.pubkey(),
                         preferred_validator_ixs,
                         &[],
-                        args.fee_limit_cu,
+                        args.fee_limit_cb,
                     )
                     .await
                 }

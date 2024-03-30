@@ -9,7 +9,7 @@ use spl_stake_pool_interface::{
     SetManagerKeys, SetStakerKeys, StakePool,
 };
 
-use crate::utils::filter_default_stake_deposit_auth;
+use crate::parse::filter_default_stake_deposit_auth;
 
 use super::utils::pubkey_opt_display;
 

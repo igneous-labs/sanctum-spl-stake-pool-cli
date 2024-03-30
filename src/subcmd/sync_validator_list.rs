@@ -50,6 +50,7 @@ impl SyncValidatorListArgs {
 
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();
+        let program_id = args.program.program_id();
 
         let staker = staker.map_or_else(|| None, |s| parse_signer(&s).ok()); // if staker is not a valid signer, treat it as None and fall back to payer
         let staker = staker
@@ -75,19 +76,19 @@ impl SyncValidatorListArgs {
             rpc: &rpc,
             send_mode: args.send_mode,
             payer: payer.as_ref(),
-            program_id: args.program,
+            program_id,
             current_epoch: epoch,
             stake_pool: Keyed {
                 pubkey: pool,
                 account: &stake_pool_acc,
             },
             validator_list_entries: &old_validators,
-            fee_limit_cu: args.fee_limit_cu,
+            fee_limit_cb: args.fee_limit_cb,
         })
         .await;
 
         let svlc = SyncValidatorListConfig {
-            program_id: args.program,
+            program_id,
             payer: payer.as_ref(),
             staker,
             pool,
@@ -120,7 +121,7 @@ impl SyncValidatorListArgs {
                         &payer.pubkey(),
                         Vec::from(remove_validator_ix_chunk),
                         &[],
-                        args.fee_limit_cu,
+                        args.fee_limit_cb,
                     )
                     .await
                 }
@@ -151,7 +152,7 @@ impl SyncValidatorListArgs {
                         &payer.pubkey(),
                         Vec::from(add_validator_ix_chunk),
                         &[],
-                        args.fee_limit_cu,
+                        args.fee_limit_cb,
                     )
                     .await
                 }
@@ -182,7 +183,7 @@ impl SyncValidatorListArgs {
                         &payer.pubkey(),
                         preferred_validator_ixs,
                         &[],
-                        args.fee_limit_cu,
+                        args.fee_limit_cb,
                     )
                     .await
                 }
