@@ -24,7 +24,7 @@ pub struct UpdatePoolIfNeededArgs<'a> {
     pub current_epoch: u64,
     pub stake_pool: Keyed<&'a Account>,
     pub validator_list_entries: &'a [ValidatorStakeInfo],
-    pub fee_limit_cu: u64,
+    pub fee_limit_cb: u64,
 }
 
 // ignores entries already updated for this epoch
@@ -37,7 +37,7 @@ pub async fn update_pool_if_needed(
         current_epoch,
         stake_pool,
         validator_list_entries,
-        fee_limit_cu,
+        fee_limit_cb,
     }: UpdatePoolIfNeededArgs<'_>,
 ) {
     let sp = StakePool::deserialize(&mut stake_pool.account.data.as_slice()).unwrap();
@@ -45,6 +45,7 @@ pub async fn update_pool_if_needed(
         eprintln!("Update not required");
         return;
     }
+    eprintln!("Update required");
     let uvlb = UpdateValidatorListBalance { stake_pool };
     // just do it sequentially
     for (i, chunk) in validator_list_entries
@@ -70,7 +71,7 @@ pub async fn update_pool_if_needed(
             .unwrap()];
         let ixs = match send_mode {
             TxSendMode::DumpMsg => ixs,
-            _ => with_auto_cb_ixs(rpc, &payer.pubkey(), ixs, &[], fee_limit_cu).await,
+            _ => with_auto_cb_ixs(rpc, &payer.pubkey(), ixs, &[], fee_limit_cb).await,
         };
         eprintln!(
             "Updating validator list [{}..{}]",
@@ -100,7 +101,7 @@ pub async fn update_pool_if_needed(
     ];
     let final_ixs = match send_mode {
         TxSendMode::DumpMsg => final_ixs,
-        _ => with_auto_cb_ixs(rpc, &payer.pubkey(), final_ixs, &[], fee_limit_cu).await,
+        _ => with_auto_cb_ixs(rpc, &payer.pubkey(), final_ixs, &[], fee_limit_cb).await,
     };
     eprintln!("Sending final update tx");
     handle_tx_full(rpc, send_mode, &final_ixs, &[], &mut [payer]).await;

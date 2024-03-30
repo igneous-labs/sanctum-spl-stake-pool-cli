@@ -30,9 +30,9 @@ pub async fn with_auto_cb_ixs(
     payer_pk: &Pubkey,
     mut ixs: Vec<Instruction>,
     luts: &[AddressLookupTableAccount],
-    fee_limit_cu_lamports: u64,
+    fee_limit_cb_lamports: u64,
 ) -> Vec<Instruction> {
-    if fee_limit_cu_lamports == 0 {
+    if fee_limit_cb_lamports == 0 {
         return ixs;
     }
     let message =
@@ -57,7 +57,7 @@ pub async fn with_auto_cb_ixs(
         .unwrap()
         .value;
     let units = ((units_consumed.unwrap() as f64) * CU_BUFFER_RATIO).ceil();
-    let lamport_per_cu = (fee_limit_cu_lamports as f64) / units;
+    let lamport_per_cu = (fee_limit_cb_lamports as f64) / units;
     let microlamports_per_cu = (lamport_per_cu * 1_000_000.0).floor();
     let units = units as u32;
     let microlamports_per_cu = max(1, microlamports_per_cu as u64);

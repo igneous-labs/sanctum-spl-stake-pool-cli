@@ -1,5 +1,10 @@
 [pool]
-mint = "EBm88rgvrZZeD2Rq1rEiXqT36VdK2ew1XYitn7Cji8Lc" # must be initialized beforehand with mint authority transferred to manager 
+# must be initialized beforehand with:
+# - 9 decimals
+# - no freeze authority
+# - only allowable token-extensions
+# - mint authority transferred to manager 
+mint = "EBm88rgvrZZeD2Rq1rEiXqT36VdK2ew1XYitn7Cji8Lc"
 
 # random keypair generation is not allowed to allow users to recover in event of init failure
 pool = "./test-fixtures/example-pool-keypair.json"
