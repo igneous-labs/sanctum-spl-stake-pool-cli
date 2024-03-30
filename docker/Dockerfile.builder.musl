@@ -1,0 +1,21 @@
+# This Dockerfile creates a builder image that can be used to compile a statically-linked
+# CLI binary that can work across all linux distros
+#
+# Run in this directory:
+# docker build -f Dockerfile.builder.musl -t splsp-builder .
+# 
+# Run in repo root:
+# docker run -v ./:/workspace --name splsp-builder splsp-builder sh -c "cd /workspace && cargo build --release"
+# 
+# Or for interactive (so that you can cancel the build halfway with ctrl+c if needed):
+# docker run -it -v ./:/workspace --name splsp-builder splsp-builder sh
+# > cargo build --release
+
+FROM rust:1.75.0-alpine3.19
+# musl-dev required for libc
+# eudev-dev required for libudev
+# linux-headers required for linux/hidraw.h for hidapi
+RUN apk add --no-cache \
+    musl-dev \
+    eudev-dev \
+    linux-headers

@@ -19,3 +19,9 @@ Stake pool program ID is parameterized to allow for use across different deploys
 ### Toml file based
 
 This CLI revolves around syncing stake pool state with a config specified in a toml file. All inputs and outputs are in toml file format.
+
+## Build
+
+### Statically Linked
+
+Follow instructions in `/docker/Dockerfile.builder.musl`
