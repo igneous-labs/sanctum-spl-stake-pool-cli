@@ -6,7 +6,7 @@ use clap::{
     Args,
 };
 use solana_readonly_account::keyed::Keyed;
-use solana_sdk::{epoch_info::EpochInfo, pubkey::Pubkey};
+use solana_sdk::{clock::Clock, pubkey::Pubkey, sysvar};
 use spl_stake_pool_interface::{StakePool, ValidatorList};
 
 use crate::update::{update_pool_if_needed, UpdatePoolIfNeededArgs};
@@ -34,13 +34,20 @@ impl UpdateArgs {
         let payer = args.config.signer();
         let program_id = args.program.program_id();
 
-        let stake_pool_acc = rpc.get_account(&pool).await.unwrap();
+        let mut fetched = rpc
+            .get_multiple_accounts(&[pool, sysvar::clock::ID])
+            .await
+            .unwrap();
+        let clock = fetched.pop().unwrap().unwrap();
+        let stake_pool_acc = fetched.pop().unwrap().unwrap();
+
+        let Clock { epoch, .. } = bincode::deserialize(&clock.data).unwrap();
         let stake_pool = StakePool::deserialize(&mut stake_pool_acc.data.as_slice()).unwrap();
+
         let validator_list_acc = rpc.get_account(&stake_pool.validator_list).await.unwrap();
+
         let ValidatorList { validators, .. } =
             ValidatorList::deserialize(&mut validator_list_acc.data.as_slice()).unwrap();
-
-        let EpochInfo { epoch, .. } = rpc.get_epoch_info().await.unwrap();
 
         update_pool_if_needed(UpdatePoolIfNeededArgs {
             rpc: &rpc,

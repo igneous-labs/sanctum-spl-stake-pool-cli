@@ -1,72 +1,8 @@
-use clap::{builder::ValueParser, Parser};
-use parse::SplStakePoolProgram;
-use sanctum_solana_cli_utils::{ConfigWrapper, TxSendMode};
-use subcmd::Subcmd;
+use clap::Parser;
 use tokio::runtime::Runtime;
 
-mod luts;
-mod parse;
-mod pool_config;
-mod sorted_signers;
-mod subcmd;
-mod tx_utils;
-mod update;
-
-#[cfg(test)]
-mod test_utils;
-
-#[derive(Parser, Debug)]
-#[command(author, version, about = "Sanctum SPL Stake Pool CLI")]
-pub struct Args {
-    #[arg(
-        long,
-        short,
-        help = "Path to solana CLI config. Defaults to solana cli default if not provided",
-        default_value = "",
-        value_parser = ValueParser::new(ConfigWrapper::parse_from_path)
-    )]
-    pub config: ConfigWrapper,
-
-    #[arg(
-        long,
-        short,
-        help = "Transaction send mode.
-- send-actual: signs and sends the tx to the cluster specified in config and outputs hash to stderr
-- sim-only: simulates the tx against the cluster and outputs logs to stderr
-- dump-msg: dumps the base64 encoded tx to stdout. For use with inspectors and multisigs
-",
-        default_value_t = TxSendMode::default(),
-        value_enum,
-    )]
-    pub send_mode: TxSendMode,
-
-    #[arg(
-        long,
-        short,
-        help = "0 - disable ComputeBudgetInstruction prepending.
-Any positive integer - enable dynamic compute budget calculation:
-Before sending a TX, simulate the tx and prepend with appropriate ComputeBudgetInstructions.
-This arg is the max priority fee the user will pay per transaction in lamports.
-",
-        default_value_t = 1
-    )]
-    pub fee_limit_cb: u64,
-
-    #[arg(
-        long,
-        short,
-        help = SplStakePoolProgram::HELP_STR,
-        default_value_t = SplStakePoolProgram::Spl,
-        value_parser = ValueParser::new(SplStakePoolProgram::parse),
-    )]
-    pub program: SplStakePoolProgram,
-
-    #[command(subcommand)]
-    pub subcmd: Subcmd,
-}
-
 fn main() {
-    let args = Args::parse();
+    let args = sanctum_spl_stake_pool_cli::Args::parse();
     let rt = Runtime::new().unwrap();
-    rt.block_on(Subcmd::run(args));
+    rt.block_on(sanctum_spl_stake_pool_cli::Subcmd::run(args));
 }

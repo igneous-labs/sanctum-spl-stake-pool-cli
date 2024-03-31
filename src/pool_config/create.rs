@@ -43,7 +43,7 @@ pub struct CreateConfig<'a, T> {
     // Used to calculate how much to fund the reserve by so that the first VSAs can be
     // added immediately
     pub starting_validators: usize,
-    pub rent: Rent,
+    pub rent: &'a Rent,
 }
 
 impl<'a, T: ReadonlyAccountOwner + ReadonlyAccountData> CreateConfig<'a, T> {
@@ -52,10 +52,10 @@ impl<'a, T: ReadonlyAccountOwner + ReadonlyAccountData> CreateConfig<'a, T> {
         let create_reserve_ix = system_instruction::create_account(
             &self.payer.pubkey(),
             &self.reserve.pubkey(),
-            min_reserve_lamports(&self.rent).saturating_add(
+            min_reserve_lamports(self.rent).saturating_add(
                 u64::try_from(self.starting_validators)
                     .unwrap()
-                    .saturating_mul(lamports_for_new_vsa(&self.rent)),
+                    .saturating_mul(lamports_for_new_vsa(self.rent)),
             ),
             std::mem::size_of::<StakeStateV2>().try_into().unwrap(),
             &stake::program::ID,
@@ -97,6 +97,8 @@ impl<'a, T: ReadonlyAccountOwner + ReadonlyAccountData> CreateConfig<'a, T> {
                 new_authority: Some(pool_withdraw_auth),
             },
         )?;
+        // like to use get_instance_packed_len() here
+        // but thats only available on borsh ^1.0
         let dummy_validator_list = ValidatorList {
             header: ValidatorListHeader {
                 account_type: AccountType::ValidatorList,
@@ -205,7 +207,7 @@ mod tests {
         let (manager_fee_account, _bump) = FindAtaAddressArgs {
             wallet: manager.pubkey(),
             mint,
-            token_program: spl_token::ID,
+            token_program: spl_token_interface::ID,
         }
         .find_ata_address();
         let config = CreateConfig {
@@ -237,7 +239,7 @@ mod tests {
             },
             max_validators: 13,
             starting_validators: 1,
-            rent: Rent::default(),
+            rent: &Rent::default(),
         };
 
         assert_tx_with_cu_ixs_within_size_limits(

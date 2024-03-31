@@ -4,12 +4,12 @@ use borsh::BorshDeserialize;
 use clap::Args;
 use sanctum_solana_cli_utils::{parse_pubkey_src, parse_signer, TxSendMode};
 use solana_readonly_account::keyed::Keyed;
-use solana_sdk::{epoch_info::EpochInfo, pubkey::Pubkey};
+use solana_sdk::{clock::Clock, pubkey::Pubkey, rent::Rent, sysvar};
 use spl_stake_pool_interface::{StakePool, ValidatorList};
 
 use crate::{
     pool_config::{
-        print_adding_validators_msg, print_removing_validators_msg, ConfigFileRaw,
+        print_adding_validators_msg, print_removing_validators_msg, ConfigRaw,
         SyncValidatorListConfig,
     },
     tx_utils::{
@@ -39,14 +39,14 @@ impl SyncValidatorListArgs {
             _ => unreachable!(),
         };
 
-        let ConfigFileRaw {
+        let ConfigRaw {
             preferred_deposit_validator,
             preferred_withdraw_validator,
             validators,
             pool,
             staker,
             ..
-        } = ConfigFileRaw::read_from_path(pool_config).unwrap();
+        } = ConfigRaw::read_from_path(pool_config).unwrap();
 
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();
@@ -61,15 +61,24 @@ impl SyncValidatorListArgs {
                 .map(|opt| opt.map(|s| parse_pubkey_src(&s).unwrap().pubkey()));
 
         let pool = parse_pubkey_src(pool.as_ref().unwrap()).unwrap().pubkey();
-        let stake_pool_acc = rpc.get_account(&pool).await.unwrap();
+
+        let mut fetched = rpc
+            .get_multiple_accounts(&[pool, sysvar::clock::ID, sysvar::rent::ID])
+            .await
+            .unwrap();
+        let rent = fetched.pop().unwrap().unwrap();
+        let clock = fetched.pop().unwrap().unwrap();
+        let stake_pool_acc = fetched.pop().unwrap().unwrap();
+
+        let rent: Rent = bincode::deserialize(&rent.data).unwrap();
+        let Clock { epoch, .. } = bincode::deserialize(&clock.data).unwrap();
         let stake_pool = StakePool::deserialize(&mut stake_pool_acc.data.as_slice()).unwrap();
+
         let validator_list_acc = rpc.get_account(&stake_pool.validator_list).await.unwrap();
         let ValidatorList {
             validators: old_validators,
             ..
         } = ValidatorList::deserialize(&mut validator_list_acc.data.as_slice()).unwrap();
-
-        let EpochInfo { epoch, .. } = rpc.get_epoch_info().await.unwrap();
 
         // need to update first to be able to add/remove validators
         update_pool_if_needed(UpdatePoolIfNeededArgs {
@@ -101,6 +110,7 @@ impl SyncValidatorListArgs {
                 .into_iter()
                 .map(|v| Pubkey::from_str(&v.vote).unwrap())
                 .collect(),
+            rent: &rent,
         };
 
         let (add, remove) = svlc.add_remove_changeset(&old_validators);

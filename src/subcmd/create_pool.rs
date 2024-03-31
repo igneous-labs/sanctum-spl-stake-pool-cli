@@ -15,7 +15,7 @@ use spl_token_2022::{extension::StateWithExtensions, state::Mint};
 use crate::{
     parse::filter_default_stake_deposit_auth,
     pool_config::{
-        print_adding_validators_msg, ConfigFileRaw, CreateConfig, SyncPoolConfig,
+        print_adding_validators_msg, ConfigRaw, CreateConfig, SyncPoolConfig,
         SyncValidatorListConfig,
     },
     subcmd::Subcmd,
@@ -36,7 +36,7 @@ impl CreatePoolArgs {
             _ => unreachable!(),
         };
 
-        let ConfigFileRaw {
+        let ConfigRaw {
             mint,
             pool,
             validator_list,
@@ -59,7 +59,7 @@ impl CreatePoolArgs {
             preferred_deposit_validator,
             preferred_withdraw_validator,
             ..
-        } = ConfigFileRaw::read_from_path(pool_config).unwrap();
+        } = ConfigRaw::read_from_path(pool_config).unwrap();
 
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();
@@ -88,8 +88,8 @@ impl CreatePoolArgs {
             .await
             .unwrap();
         let mint_acc = fetched.pop().unwrap();
-
         let rent = fetched.pop().unwrap().unwrap();
+
         let rent: Rent = bincode::deserialize(&rent.data).unwrap();
 
         let mint_acc = mint_acc.expect("Mint not initialized");
@@ -105,6 +105,8 @@ impl CreatePoolArgs {
         let manager_fee_account = manager_fee_account
             .map(|s| Pubkey::from_str(&s).unwrap())
             .unwrap_or(manager_fee_ata);
+        // use get_multiple so that it returns None instead of err
+        // if acc doesnt exist
         let manager_fee_fetched = rpc
             .get_multiple_accounts(&[manager_fee_account])
             .await
@@ -184,7 +186,7 @@ impl CreatePoolArgs {
             withdrawal_fee,
             deposit_fee,
             max_validators,
-            rent,
+            rent: &rent,
             starting_validators,
         };
 
@@ -338,6 +340,7 @@ impl CreatePoolArgs {
                 .into_iter()
                 .map(|v| Pubkey::from_str(&v.vote).unwrap())
                 .collect(),
+            rent: &rent,
         };
 
         // starting validator list is empty

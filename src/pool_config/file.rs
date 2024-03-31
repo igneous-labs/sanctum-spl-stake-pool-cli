@@ -8,14 +8,16 @@ use serde::{Deserialize, Serialize};
 use solana_sdk::pubkey::Pubkey;
 use spl_stake_pool_interface::{Fee, FutureEpochFee, StakeStatus, ValidatorStakeInfo};
 
+/// Owned version of [`ConfigTomlFile`].
+/// Used to deserialize input config toml files
 #[derive(Debug, Deserialize, Serialize)]
-struct ConfigFileTomlFile {
-    pub pool: ConfigFileRaw,
+struct ConfigTomlFileOwned {
+    pub pool: ConfigRaw,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub struct ConfigFileRaw {
+pub struct ConfigRaw {
     pub mint: Option<String>,
     pub token_program: Option<String>,
     pub pool: Option<String>,
@@ -112,22 +114,23 @@ impl ValidatorConfigRaw {
     }
 }
 
-impl ConfigFileRaw {
-    pub fn read_from_path<P: AsRef<Path>>(path: P) -> Result<ConfigFileRaw, std::io::Error> {
+impl ConfigRaw {
+    pub fn read_from_path<P: AsRef<Path>>(path: P) -> Result<ConfigRaw, std::io::Error> {
         // toml crate only handles strings, not io::Read lol
         let s = read_to_string(path)?;
-        let ConfigFileTomlFile { pool } =
+        let ConfigTomlFileOwned { pool } =
             toml::from_str(&s).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         Ok(pool)
     }
 }
 
+/// Used to serialize output config tomls
 #[derive(Clone, Copy, Debug, Serialize)]
-pub struct ConfigFileTomlOutput<'a> {
-    pub pool: &'a ConfigFileRaw,
+pub struct ConfigTomlFile<'a> {
+    pub pool: &'a ConfigRaw,
 }
 
-impl<'a> std::fmt::Display for ConfigFileTomlOutput<'a> {
+impl<'a> std::fmt::Display for ConfigTomlFile<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&toml::to_string_pretty(self).unwrap())
     }
@@ -143,7 +146,7 @@ mod tests {
     #[test]
     fn deser_example_config() {
         let example_path = test_fixtures_dir().join("example-init-pool-config.toml");
-        let res = ConfigFileRaw::read_from_path(example_path).unwrap();
+        let res = ConfigRaw::read_from_path(example_path).unwrap();
         // sample some fields
         assert_eq!(res.max_validators, Some(2));
         assert_eq!(
@@ -163,6 +166,6 @@ mod tests {
             "FnAPJkzf19s87sm24Qhv6bHZMZvZ43gjNUBRgjwXpD4v"
         );
 
-        eprintln!("{}", ConfigFileTomlOutput { pool: &res });
+        eprintln!("{}", ConfigTomlFile { pool: &res });
     }
 }

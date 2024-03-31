@@ -7,7 +7,7 @@ use solana_sdk::pubkey::Pubkey;
 use spl_stake_pool_interface::StakePool;
 
 use crate::{
-    pool_config::{ConfigFileRaw, SyncPoolConfig},
+    pool_config::{ConfigRaw, SyncPoolConfig},
     tx_utils::{handle_tx_full, with_auto_cb_ixs},
 };
 
@@ -27,7 +27,7 @@ impl SyncPoolArgs {
             _ => unreachable!(),
         };
 
-        let ConfigFileRaw {
+        let ConfigRaw {
             pool,
             manager,
             manager_fee_account,
@@ -44,7 +44,7 @@ impl SyncPoolArgs {
             sol_withdraw_auth,
             old_manager,
             ..
-        } = ConfigFileRaw::read_from_path(pool_config).unwrap();
+        } = ConfigRaw::read_from_path(pool_config).unwrap();
 
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();

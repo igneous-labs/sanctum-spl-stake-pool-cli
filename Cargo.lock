@@ -3400,11 +3400,11 @@ dependencies = [
  "solana-readonly-account",
  "solana-sdk",
  "solana-transaction-status",
- "spl-token",
  "spl-token-2022 1.0.0",
  "spl_associated_token_account_interface",
  "spl_stake_pool_interface",
  "spl_token_interface",
+ "tempfile",
  "tokio",
  "toml 0.8.12",
 ]
