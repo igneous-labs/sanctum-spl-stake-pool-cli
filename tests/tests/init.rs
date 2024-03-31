@@ -35,8 +35,7 @@ async fn init_basic_manager_payer_same() {
     cmd.arg("create-pool")
         .arg(test_fixtures_dir().join("example-init-pool-config.toml"));
 
-    let (exec_res, stderr) = exec_b64_txs(&mut cmd, &mut bc).await;
-    eprintln!("{stderr}");
+    let exec_res = exec_b64_txs(&mut cmd, &mut bc).await;
     assert_all_txs_success_nonempty(&exec_res);
 
     let stake_pool: StakePool =
@@ -48,7 +47,7 @@ async fn init_basic_manager_payer_same() {
         FindAtaAddressArgs {
             wallet: manager.pubkey(),
             mint,
-            token_program: spl_token::ID
+            token_program: spl_token_interface::ID
         }
         .find_ata_address()
         .0

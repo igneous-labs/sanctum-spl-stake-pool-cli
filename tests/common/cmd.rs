@@ -13,19 +13,21 @@ pub fn base_cmd(cfg: &TempCliConfig) -> Command {
     cmd
 }
 
+// TODO: add simulating txs to ExtendedBanksClient
 pub async fn exec_b64_txs(
     cmd: &mut Command,
     bc: &mut BanksClient,
-) -> (
-    Vec<Result<BanksTransactionResultWithMetadata, BanksClientError>>,
-    String,
-) {
+) -> Vec<Result<BanksTransactionResultWithMetadata, BanksClientError>> {
     let Output {
         stdout,
         status,
         stderr,
     } = cmd.output().unwrap();
-    assert!(status.success());
+    assert!(
+        status.success(),
+        "{}",
+        std::str::from_utf8(&stderr).unwrap()
+    );
     let stdout = std::str::from_utf8(&stdout).unwrap();
     // run txs in sequence, waiting on result of the prev before exec-ing next
     let mut res = vec![];
@@ -34,7 +36,7 @@ pub async fn exec_b64_txs(
             res.push(bc.exec_b64_tx(b64.as_bytes()).await);
         }
     }
-    (res, std::str::from_utf8(&stderr).unwrap().to_owned())
+    res
 }
 
 pub fn assert_all_txs_success_nonempty(

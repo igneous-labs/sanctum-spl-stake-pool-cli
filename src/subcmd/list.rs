@@ -2,7 +2,7 @@ use clap::Args;
 use sanctum_solana_cli_utils::parse_pubkey_src;
 use spl_stake_pool_interface::{StakePool, ValidatorList};
 
-use crate::pool_config::{ConfigFileRaw, ConfigFileTomlOutput};
+use crate::pool_config::{ConfigRaw, ConfigTomlFile};
 
 use super::Subcmd;
 
@@ -34,7 +34,7 @@ impl ListArgs {
         let rpc = args.config.nonblocking_rpc_client();
         let program_id = args.program.program_id();
 
-        let mut display = ConfigFileRaw::default();
+        let mut display = ConfigRaw::default();
         display.set_pool_pk(pool);
 
         let fetched_pool = rpc.get_account(&pool).await.unwrap();
@@ -60,6 +60,6 @@ impl ListArgs {
             display.set_validator_list(&program_id, &pool, &decoded_validator_list);
         }
 
-        println!("{}", ConfigFileTomlOutput { pool: &display })
+        println!("{}", ConfigTomlFile { pool: &display })
     }
 }

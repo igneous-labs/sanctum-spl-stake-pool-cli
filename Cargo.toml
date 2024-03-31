@@ -7,6 +7,9 @@ edition = "2021"
 name = "splsp"
 path = "src/main.rs"
 
+[lib]
+name = "sanctum_spl_stake_pool_cli"
+
 [dependencies]
 bincode = "^1"
 borsh = "^0.10"
@@ -38,6 +41,15 @@ solana-transaction-status = "~1.17" # need to explicitly specify or cargo pulls 
 [dev-dependencies]
 assert_cmd = "^1"
 data-encoding = "^2"
-sanctum-solana-test-utils = { features = ["banks-rpc-server", "cli", "token"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "b2b880b" }
 solana-program-test = "~1.17"
-spl-token = "^4"
+tempfile = "^3"
+
+[dev-dependencies.sanctum-solana-test-utils]
+git = "https://github.com/igneous-labs/sanctum-solana-utils"
+rev = "b2b880b"
+features = [
+    "banks-rpc-server",
+    "cli",
+    "stake",
+    "token"
+]

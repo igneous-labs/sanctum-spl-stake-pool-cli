@@ -1,12 +1,13 @@
-use std::{collections::HashSet, fmt::Display, num::NonZeroU32};
+use std::{collections::HashSet, fmt::Display, iter::Flatten, num::NonZeroU32};
 
 use sanctum_spl_stake_pool_lib::{
-    FindEphemeralStakeAccount, FindEphemeralStakeAccountArgs, FindTransientStakeAccount,
-    FindTransientStakeAccountArgs, FindValidatorStakeAccount, FindValidatorStakeAccountArgs,
-    FindWithdrawAuthority,
+    lamports_for_new_vsa, FindEphemeralStakeAccount, FindEphemeralStakeAccountArgs,
+    FindTransientStakeAccount, FindTransientStakeAccountArgs, FindValidatorStakeAccount,
+    FindValidatorStakeAccountArgs, FindWithdrawAuthority,
 };
 use solana_sdk::{
-    instruction::Instruction, pubkey::Pubkey, signer::Signer, stake, system_program, sysvar,
+    instruction::Instruction, pubkey::Pubkey, rent::Rent, signer::Signer, stake, system_program,
+    sysvar,
 };
 use spl_stake_pool_interface::{
     add_validator_to_pool_ix_with_program_id,
@@ -34,6 +35,7 @@ pub struct SyncValidatorListConfig<'a> {
     pub validators: HashSet<Pubkey>,
     pub preferred_deposit_validator: Option<Pubkey>,
     pub preferred_withdraw_validator: Option<Pubkey>,
+    pub rent: &'a Rent,
 }
 
 #[derive(Clone, Debug)]
@@ -236,7 +238,9 @@ impl<'a> SyncValidatorListConfig<'a> {
                 stake_program: stake::program::ID,
             },
         )?;
-        Ok(if *active_stake_lamports > 0 {
+        let lamports_to_decrease =
+            active_stake_lamports.saturating_sub(lamports_for_new_vsa(self.rent));
+        Ok(if lamports_to_decrease > 0 {
             let ephemeral_stake_seed = 0;
             let decrease_ix = decrease_additional_validator_stake_ix_with_program_id(
                 self.program_id,
@@ -263,7 +267,7 @@ impl<'a> SyncValidatorListConfig<'a> {
                 },
                 DecreaseAdditionalValidatorStakeIxArgs {
                     args: AdditionalValidatorStakeArgs {
-                        lamports: *active_stake_lamports,
+                        lamports: lamports_to_decrease,
                         transient_stake_seed: *transient_seed_suffix,
                         ephemeral_stake_seed,
                     },
@@ -282,13 +286,15 @@ pub enum RemoveValidatorIxs {
     RemoveDirectly(Instruction),
 }
 
-impl RemoveValidatorIxs {
-    pub fn into_iter(self) -> impl Iterator<Item = Instruction> {
-        // hax to make both iterators the same type
-        let fm = |ix_opt| ix_opt;
+impl IntoIterator for RemoveValidatorIxs {
+    type Item = Instruction;
+
+    type IntoIter = Flatten<std::array::IntoIter<Option<Instruction>, 2>>;
+
+    fn into_iter(self) -> Self::IntoIter {
         match self {
-            Self::WithDecreaseStake(i1, i2) => [Some(i1), Some(i2)].into_iter().filter_map(fm),
-            Self::RemoveDirectly(i) => [Some(i), None].into_iter().filter_map(fm),
+            Self::WithDecreaseStake(i1, i2) => [Some(i1), Some(i2)].into_iter().flatten(),
+            Self::RemoveDirectly(i) => [Some(i), None].into_iter().flatten(),
         }
     }
 }

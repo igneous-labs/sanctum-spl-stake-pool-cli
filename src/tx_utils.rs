@@ -95,7 +95,7 @@ pub async fn handle_tx_full(
 mod tests {
     use std::collections::HashSet;
 
-    use solana_sdk::signature::Keypair;
+    use solana_sdk::{rent::Rent, signature::Keypair};
     use spl_stake_pool_interface::{StakeStatus, ValidatorStakeInfo};
 
     use crate::{
@@ -122,6 +122,7 @@ mod tests {
             // dont care
             preferred_deposit_validator: None,
             preferred_withdraw_validator: None,
+            rent: &Rent::default(),
         };
         let (add, _remove) = svlc.add_remove_changeset(&[]);
         let ixs = svlc.add_validators_ixs(add).unwrap();
@@ -162,6 +163,7 @@ mod tests {
             validator_list: Pubkey::new_unique(),
             reserve: Pubkey::new_unique(),
             validators: HashSet::new(),
+            rent: &Rent::default(),
             // dont care
             preferred_deposit_validator: None,
             preferred_withdraw_validator: None,
