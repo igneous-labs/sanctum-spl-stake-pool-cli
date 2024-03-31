@@ -9,6 +9,7 @@
 # 
 # Or for interactive (so that you can cancel the build halfway with ctrl+c if needed):
 # docker run -it -v ./:/workspace --name splsp-builder splsp-builder sh
+# > cd workspace
 # > cargo build --release
 
 FROM rust:1.75.0-alpine3.19
