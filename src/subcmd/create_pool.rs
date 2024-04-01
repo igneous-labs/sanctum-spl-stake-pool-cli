@@ -1,12 +1,18 @@
 use std::{cmp::Ordering, error::Error, path::PathBuf, str::FromStr};
 
+use borsh::BorshDeserialize;
 use clap::Args;
 use sanctum_associated_token_lib::FindAtaAddressArgs;
 use sanctum_solana_cli_utils::{parse_pubkey_src, parse_signer, TxSendMode};
-use sanctum_spl_stake_pool_lib::{CmpFee, FindDepositAuthority, ZERO_FEE};
+use sanctum_spl_stake_pool_lib::{CmpFee, FindDepositAuthority, FindWithdrawAuthority, ZERO_FEE};
 use solana_readonly_account::{keyed::Keyed, ReadonlyAccountOwner};
 use solana_sdk::{
-    account::Account, program_option::COption, pubkey::Pubkey, rent::Rent, system_program, sysvar,
+    account::Account,
+    program_option::COption,
+    pubkey::Pubkey,
+    rent::Rent,
+    stake::state::{Authorized, StakeStateV2},
+    system_program, sysvar,
 };
 use spl_associated_token_account_interface::CreateIdempotentKeys;
 use spl_stake_pool_interface::{AccountType, Fee, FutureEpochFee, Lockup, StakePool};
@@ -105,14 +111,13 @@ impl CreatePoolArgs {
         let manager_fee_account = manager_fee_account
             .map(|s| Pubkey::from_str(&s).unwrap())
             .unwrap_or(manager_fee_ata);
-        // use get_multiple so that it returns None instead of err
-        // if acc doesnt exist
-        let manager_fee_fetched = rpc
-            .get_multiple_accounts(&[manager_fee_account])
+
+        let mut fetched = rpc
+            .get_multiple_accounts(&[manager_fee_account, reserve.pubkey()])
             .await
-            .unwrap()
-            .pop()
             .unwrap();
+        let reserve_fetched = fetched.pop().unwrap();
+        let manager_fee_fetched = fetched.pop().unwrap();
 
         let (default_stake_deposit_auth, _bump) = FindDepositAuthority {
             pool: pool.pubkey(),
@@ -190,7 +195,23 @@ impl CreatePoolArgs {
             starting_validators,
         };
 
-        let mut first_ixs = Vec::from(cc.create_reserve_tx_ixs().unwrap());
+        let mut first_ixs = if let Some(reserve_acc) = reserve_fetched {
+            let ss = StakeStateV2::deserialize(&mut reserve_acc.data.as_slice()).unwrap();
+            let (sp_withdraw_auth, _bump) = FindWithdrawAuthority {
+                pool: pool.pubkey(),
+            }
+            .run_for_prog(&program_id);
+            if ss.authorized().unwrap() != Authorized::auto(&sp_withdraw_auth) {
+                panic!(
+                    "Reserve stake has been created but authority is not set to withdraw auth {sp_withdraw_auth}"
+                );
+            }
+            eprintln!("Reserve stake already initialized");
+            Vec::new()
+        } else {
+            eprintln!("Creating reserve stake");
+            Vec::from(cc.create_reserve_tx_ixs().unwrap())
+        };
 
         if manager_fee_fetched.is_none() {
             if manager_fee_account != manager_fee_ata {
@@ -211,18 +232,22 @@ impl CreatePoolArgs {
                 .unwrap(),
             );
         }
-        let first_ixs = match args.send_mode {
-            TxSendMode::DumpMsg => first_ixs,
-            _ => with_auto_cb_ixs(&rpc, &payer.pubkey(), first_ixs, &[], args.fee_limit_cb).await,
-        };
-        handle_tx_full(
-            &rpc,
-            args.send_mode,
-            &first_ixs,
-            &[],
-            &mut cc.create_reserve_tx_signers_maybe_dup(),
-        )
-        .await;
+        if !first_ixs.is_empty() {
+            let first_ixs = match args.send_mode {
+                TxSendMode::DumpMsg => first_ixs,
+                _ => {
+                    with_auto_cb_ixs(&rpc, &payer.pubkey(), first_ixs, &[], args.fee_limit_cb).await
+                }
+            };
+            handle_tx_full(
+                &rpc,
+                args.send_mode,
+                &first_ixs,
+                &[],
+                &mut cc.create_reserve_tx_signers_maybe_dup(),
+            )
+            .await;
+        }
 
         let ixs = Vec::from(cc.initialize_tx_ixs().unwrap());
         let ixs = match args.send_mode {
@@ -310,20 +335,23 @@ impl CreatePoolArgs {
             eprintln!("{change}");
         }
         let sync_pool_ixs = spc.changeset_ixs(&changeset).unwrap();
-        let sync_pool_ixs = match args.send_mode {
-            TxSendMode::DumpMsg => sync_pool_ixs,
-            _ => {
-                with_auto_cb_ixs(&rpc, &payer.pubkey(), sync_pool_ixs, &[], args.fee_limit_cb).await
-            }
-        };
-        handle_tx_full(
-            &rpc,
-            args.send_mode,
-            &sync_pool_ixs,
-            &[],
-            &mut spc.signers_maybe_dup(),
-        )
-        .await;
+        if !sync_pool_ixs.is_empty() {
+            let sync_pool_ixs = match args.send_mode {
+                TxSendMode::DumpMsg => sync_pool_ixs,
+                _ => {
+                    with_auto_cb_ixs(&rpc, &payer.pubkey(), sync_pool_ixs, &[], args.fee_limit_cb)
+                        .await
+                }
+            };
+            handle_tx_full(
+                &rpc,
+                args.send_mode,
+                &sync_pool_ixs,
+                &[],
+                &mut spc.signers_maybe_dup(),
+            )
+            .await;
+        }
 
         // Setup validator list
 

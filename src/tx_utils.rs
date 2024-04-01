@@ -23,7 +23,7 @@ pub const MAX_ADD_VALIDATORS_IX_PER_TX: usize = 7;
 
 pub const MAX_REMOVE_VALIDATOR_IXS_ENUM_PER_TX: usize = 5;
 
-const CU_BUFFER_RATIO: f64 = 1.15;
+const CU_BUFFER_RATIO: f64 = 1.33;
 
 pub async fn with_auto_cb_ixs(
     rpc: &RpcClient,
