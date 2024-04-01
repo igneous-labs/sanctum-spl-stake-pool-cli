@@ -131,6 +131,10 @@ impl SyncPoolArgs {
         for change in changeset.iter() {
             eprintln!("{change}");
         }
+        if changeset.is_empty() {
+            eprintln!("No changes necessary");
+            return;
+        }
         let sync_pool_ixs = spc.changeset_ixs(&changeset).unwrap();
         let sync_pool_ixs = match args.send_mode {
             TxSendMode::DumpMsg => sync_pool_ixs,
