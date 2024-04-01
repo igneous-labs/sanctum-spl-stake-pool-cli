@@ -83,7 +83,7 @@ impl CreatePoolArgs {
             .as_ref()
             .map(|m| m.as_ref())
             .unwrap_or(payer.as_ref());
-        let mint = Pubkey::from_str(&mint.unwrap()).unwrap();
+        let mint = parse_pubkey_src(&mint.unwrap()).unwrap().pubkey();
 
         let max_validators = max_validators.unwrap();
         let validators = validators.unwrap_or(Vec::new());
@@ -112,7 +112,7 @@ impl CreatePoolArgs {
         .find_ata_address()
         .0;
         let manager_fee_account = manager_fee_account
-            .map(|s| Pubkey::from_str(&s).unwrap())
+            .map(|s| parse_pubkey_src(&s).unwrap().pubkey())
             .unwrap_or(manager_fee_ata);
 
         let mut fetched = rpc
@@ -160,7 +160,7 @@ impl CreatePoolArgs {
             || None,
             |s| {
                 filter_default_stake_deposit_auth(
-                    Pubkey::from_str(&s).unwrap(),
+                    parse_pubkey_src(&s).unwrap().pubkey(),
                     &default_stake_deposit_auth,
                 )
             },
