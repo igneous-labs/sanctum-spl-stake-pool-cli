@@ -43,6 +43,7 @@ impl CreatePoolArgs {
         };
 
         let ConfigRaw {
+            program,
             mint,
             pool,
             validator_list,
@@ -69,7 +70,9 @@ impl CreatePoolArgs {
 
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();
-        let program_id = args.program.program_id();
+        let program_id = program
+            .expect("stake pool program was not provided")
+            .program_id();
 
         // preprocess fields
         let [pool, validator_list, reserve] =

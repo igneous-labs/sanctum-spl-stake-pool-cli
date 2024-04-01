@@ -1,5 +1,6 @@
 use std::{fmt::Display, str::FromStr};
 
+use serde::{de::Visitor, Deserialize, Serialize};
 use solana_sdk::pubkey::{ParsePubkeyError, Pubkey};
 
 pub mod sanctum_spl_stake_pool_prog {
@@ -50,6 +51,15 @@ Can either be a base58-encoded program ID or one of the following known programs
         let pk = Pubkey::from_str(arg)?;
         Ok(Self::from(pk))
     }
+
+    pub fn disp_string(&self) -> String {
+        match self {
+            Self::Spl => Self::SPL_ID.to_owned(),
+            Self::SanctumSpl => Self::SANCTUM_SPL_ID.to_owned(),
+            Self::SanctumSplMulti => Self::SANCTUM_SPL_MULTI_ID.to_owned(),
+            Self::Unknown(pk) => pk.to_string(),
+        }
+    }
 }
 
 impl From<Pubkey> for SplStakePoolProgram {
@@ -65,11 +75,41 @@ impl From<Pubkey> for SplStakePoolProgram {
 
 impl Display for SplStakePoolProgram {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Spl => f.write_str(Self::SPL_ID),
-            Self::SanctumSpl => f.write_str(Self::SANCTUM_SPL_ID),
-            Self::SanctumSplMulti => f.write_str(Self::SANCTUM_SPL_MULTI_ID),
-            Self::Unknown(pk) => write!(f, "{pk}"),
-        }
+        f.write_str(&self.disp_string())
+    }
+}
+
+impl Serialize for SplStakePoolProgram {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.disp_string())
+    }
+}
+
+struct SplStakePoolProgramVisitor;
+
+impl Visitor<'_> for SplStakePoolProgramVisitor {
+    type Value = SplStakePoolProgram;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str(SplStakePoolProgram::HELP_STR)
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        SplStakePoolProgram::parse(v).map_err(serde::de::Error::custom)
+    }
+}
+
+impl<'de> Deserialize<'de> for SplStakePoolProgram {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_str(SplStakePoolProgramVisitor)
     }
 }

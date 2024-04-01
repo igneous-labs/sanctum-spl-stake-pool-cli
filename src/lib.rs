@@ -60,15 +60,6 @@ This arg is the max priority fee the user will pay per transaction in lamports.
     )]
     pub fee_limit_cb: u64,
 
-    #[arg(
-        long,
-        short,
-        help = SplStakePoolProgram::HELP_STR,
-        default_value_t = SplStakePoolProgram::Spl,
-        value_parser = ValueParser::new(SplStakePoolProgram::parse),
-    )]
-    pub program: SplStakePoolProgram,
-
     #[command(subcommand)]
     pub subcmd: Subcmd,
 }

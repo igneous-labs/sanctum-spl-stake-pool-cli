@@ -1,4 +1,5 @@
 [pool]
+program = "spl"
 staker = "./test-fixtures/example-manager-keypair.json" # defaults to config wallet if not specified
 
 # preferred-deposit-validator = "BLADE1qNA1uNjRgER6DtUFf7FU3c1TWLLdpPeEcKatZ2" # sets to None if not specified

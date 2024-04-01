@@ -1,4 +1,5 @@
 [pool]
+program = "spl"
 mint = "EBm88rgvrZZeD2Rq1rEiXqT36VdK2ew1XYitn7Cji8Lc"
 
 # random keypair generation is not allowed to allow users to recover in event of init failure

@@ -48,13 +48,13 @@ impl SyncPoolArgs {
 
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();
-        let program_id = args.program.program_id();
 
         let pool = Pubkey::from_str(pool.as_ref().unwrap()).unwrap();
 
+        let fetched_pool = rpc.get_account(&pool).await.unwrap();
+        let program_id = fetched_pool.owner;
         let stake_pool: StakePool =
-            StakePool::deserialize(&mut rpc.get_account_data(&pool).await.unwrap().as_slice())
-                .unwrap();
+            StakePool::deserialize(&mut fetched_pool.data.as_slice()).unwrap();
 
         let curr_manager = old_manager
             .as_ref()

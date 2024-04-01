@@ -32,7 +32,6 @@ impl UpdateArgs {
 
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();
-        let program_id = args.program.program_id();
 
         let mut fetched = rpc
             .get_multiple_accounts(&[pool, sysvar::clock::ID])
@@ -41,6 +40,7 @@ impl UpdateArgs {
         let clock = fetched.pop().unwrap().unwrap();
         let stake_pool_acc = fetched.pop().unwrap().unwrap();
 
+        let program_id = stake_pool_acc.owner;
         let Clock { epoch, .. } = bincode::deserialize(&clock.data).unwrap();
         let stake_pool = StakePool::deserialize(&mut stake_pool_acc.data.as_slice()).unwrap();
 
