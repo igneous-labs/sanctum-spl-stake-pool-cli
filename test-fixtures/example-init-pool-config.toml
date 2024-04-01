@@ -1,4 +1,5 @@
 [pool]
+program = "spl"
 # must be initialized beforehand with:
 # - 9 decimals
 # - no freeze authority

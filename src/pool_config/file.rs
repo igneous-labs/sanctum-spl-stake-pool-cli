@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use solana_sdk::pubkey::Pubkey;
 use spl_stake_pool_interface::{Fee, FutureEpochFee, StakeStatus, ValidatorStakeInfo};
 
+use crate::SplStakePoolProgram;
+
 /// Owned version of [`ConfigTomlFile`].
 /// Used to deserialize input config toml files
 #[derive(Debug, Deserialize, Serialize)]
@@ -18,6 +20,7 @@ struct ConfigTomlFileOwned {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ConfigRaw {
+    pub program: Option<SplStakePoolProgram>,
     pub mint: Option<String>,
     pub token_program: Option<String>,
     pub pool: Option<String>,

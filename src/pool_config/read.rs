@@ -4,11 +4,17 @@ use sanctum_spl_stake_pool_lib::{FindDepositAuthority, FindWithdrawAuthority};
 use solana_sdk::pubkey::Pubkey;
 use spl_stake_pool_interface::{StakePool, ValidatorList, ValidatorListHeader};
 
+use crate::SplStakePoolProgram;
+
 use super::{ConfigRaw, ValidatorConfigRaw};
 
 impl ConfigRaw {
     pub fn set_pool_pk(&mut self, pool_pk: Pubkey) {
         self.pool = Some(pool_pk.to_string());
+    }
+
+    pub fn set_program(&mut self, program: Pubkey) {
+        self.program = Some(SplStakePoolProgram::from(program));
     }
 
     pub fn set_pool(

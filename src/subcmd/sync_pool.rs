@@ -1,9 +1,8 @@
-use std::{path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 
 use borsh::BorshDeserialize;
 use clap::Args;
 use sanctum_solana_cli_utils::{parse_pubkey_src, parse_signer, TxSendMode};
-use solana_sdk::pubkey::Pubkey;
 use spl_stake_pool_interface::StakePool;
 
 use crate::{
@@ -48,13 +47,13 @@ impl SyncPoolArgs {
 
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();
-        let program_id = args.program.program_id();
 
-        let pool = Pubkey::from_str(pool.as_ref().unwrap()).unwrap();
+        let pool = parse_pubkey_src(pool.as_ref().unwrap()).unwrap().pubkey();
 
+        let fetched_pool = rpc.get_account(&pool).await.unwrap();
+        let program_id = fetched_pool.owner;
         let stake_pool: StakePool =
-            StakePool::deserialize(&mut rpc.get_account_data(&pool).await.unwrap().as_slice())
-                .unwrap();
+            StakePool::deserialize(&mut fetched_pool.data.as_slice()).unwrap();
 
         let curr_manager = old_manager
             .as_ref()
@@ -131,6 +130,10 @@ impl SyncPoolArgs {
         let changeset = spc.changeset(&stake_pool);
         for change in changeset.iter() {
             eprintln!("{change}");
+        }
+        if changeset.is_empty() {
+            eprintln!("No changes necessary");
+            return;
         }
         let sync_pool_ixs = spc.changeset_ixs(&changeset).unwrap();
         let sync_pool_ixs = match args.send_mode {

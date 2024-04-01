@@ -32,18 +32,14 @@ impl ListArgs {
 
         let pool = parse_pubkey_src(&pool).unwrap().pubkey();
         let rpc = args.config.nonblocking_rpc_client();
-        let program_id = args.program.program_id();
 
         let mut display = ConfigRaw::default();
         display.set_pool_pk(pool);
 
         let fetched_pool = rpc.get_account(&pool).await.unwrap();
-        if program_id != fetched_pool.owner {
-            panic!(
-                "Wrong stake pool program. Expected {}, but stake pool's is {}",
-                args.program, fetched_pool.owner
-            )
-        }
+        let program_id = fetched_pool.owner;
+        display.set_program(program_id);
+
         let decoded_pool =
             <StakePool as borsh::BorshDeserialize>::deserialize(&mut fetched_pool.data.as_ref())
                 .unwrap();

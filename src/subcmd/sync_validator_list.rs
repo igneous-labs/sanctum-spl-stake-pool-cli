@@ -50,7 +50,6 @@ impl SyncValidatorListArgs {
 
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();
-        let program_id = args.program.program_id();
 
         let staker = staker.map_or_else(|| None, |s| parse_signer(&s).ok()); // if staker is not a valid signer, treat it as None and fall back to payer
         let staker = staker
@@ -69,6 +68,7 @@ impl SyncValidatorListArgs {
         let rent = fetched.pop().unwrap().unwrap();
         let clock = fetched.pop().unwrap().unwrap();
         let stake_pool_acc = fetched.pop().unwrap().unwrap();
+        let program_id = stake_pool_acc.owner;
 
         let rent: Rent = bincode::deserialize(&rent.data).unwrap();
         let Clock { epoch, .. } = bincode::deserialize(&clock.data).unwrap();
