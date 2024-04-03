@@ -1,10 +1,11 @@
 //! For updating Config with pool data read from onchain
 
 use sanctum_spl_stake_pool_lib::{FindDepositAuthority, FindWithdrawAuthority};
-use solana_sdk::pubkey::Pubkey;
+use solana_readonly_account::keyed::Keyed;
+use solana_sdk::{account::Account, pubkey::Pubkey};
 use spl_stake_pool_interface::{StakePool, ValidatorList, ValidatorListHeader};
 
-use crate::SplStakePoolProgram;
+use crate::{ReserveConfigRaw, SplStakePoolProgram};
 
 use super::{ConfigRaw, ValidatorConfigRaw};
 
@@ -15,6 +16,10 @@ impl ConfigRaw {
 
     pub fn set_program(&mut self, program: Pubkey) {
         self.program = Some(SplStakePoolProgram::from(program));
+    }
+
+    pub fn set_reserve(&mut self, reserve_acc: &Keyed<&Account>) {
+        self.reserve = Some(ReserveConfigRaw::from_reserve_stake_acc(reserve_acc));
     }
 
     pub fn set_pool(
@@ -55,7 +60,7 @@ impl ConfigRaw {
         self.mint = Some(pool_mint.to_string());
         self.token_program = Some(token_program_id.to_string());
         self.validator_list = Some(validator_list.to_string());
-        self.reserve = Some(reserve_stake.to_string());
+        self.reserve = Some(ReserveConfigRaw::from_pk(reserve_stake));
         self.manager = Some(manager.to_string());
         self.manager_fee_account = Some(manager_fee_account.to_string());
         self.staker = Some(staker.to_string());
