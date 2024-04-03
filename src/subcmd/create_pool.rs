@@ -75,9 +75,12 @@ impl CreatePoolArgs {
             .program_id();
 
         // preprocess fields
-        let [pool, validator_list, reserve] =
-            [pool.as_ref(), validator_list.as_ref(), reserve.as_ref()]
-                .map(|p| parse_signer(p.unwrap()).unwrap());
+        let [pool, validator_list, reserve] = [
+            pool.as_ref(),
+            validator_list.as_ref(),
+            reserve.as_ref().map(|r| &r.address),
+        ]
+        .map(|p| parse_signer(p.unwrap()).unwrap());
         let manager = manager.map(|m| parse_signer(&m).unwrap());
         let manager = manager
             .as_ref()

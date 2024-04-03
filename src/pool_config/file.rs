@@ -5,6 +5,7 @@ use sanctum_spl_stake_pool_lib::{
     FindValidatorStakeAccountArgs,
 };
 use serde::{Deserialize, Serialize};
+use solana_readonly_account::{ReadonlyAccountLamports, ReadonlyAccountPubkey};
 use solana_sdk::pubkey::Pubkey;
 use spl_stake_pool_interface::{Fee, FutureEpochFee, StakeStatus, ValidatorStakeInfo};
 
@@ -25,7 +26,6 @@ pub struct ConfigRaw {
     pub token_program: Option<String>,
     pub pool: Option<String>,
     pub validator_list: Option<String>,
-    pub reserve: Option<String>,
     pub manager: Option<String>,
     pub manager_fee_account: Option<String>,
     pub staker: Option<String>,
@@ -52,6 +52,7 @@ pub struct ConfigRaw {
     pub last_epoch_pool_token_supply: Option<u64>,
     pub last_epoch_total_lamports: Option<u64>,
     pub old_manager: Option<String>, // only present for sync-pool
+    pub reserve: Option<ReserveConfigRaw>,
     pub validators: Option<Vec<ValidatorConfigRaw>>, // put this last so it gets outputted last in toml Serialize
 }
 
@@ -114,6 +115,30 @@ impl ValidatorConfigRaw {
                 .to_string(),
             ),
         }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ReserveConfigRaw {
+    pub address: String,
+    pub lamports: Option<u64>,
+}
+
+impl ReserveConfigRaw {
+    pub fn from_pk(pk: &Pubkey) -> Self {
+        Self {
+            address: pk.to_string(),
+            lamports: None,
+        }
+    }
+
+    pub fn from_reserve_stake_acc<A: ReadonlyAccountLamports + ReadonlyAccountPubkey>(
+        account: A,
+    ) -> Self {
+        let mut res = Self::from_pk(account.pubkey());
+        res.lamports = Some(account.lamports());
+        res
     }
 }
 

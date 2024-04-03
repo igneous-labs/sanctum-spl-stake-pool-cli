@@ -1,5 +1,6 @@
 use clap::Args;
 use sanctum_solana_cli_utils::parse_pubkey_src;
+use solana_readonly_account::keyed::Keyed;
 use spl_stake_pool_interface::{StakePool, ValidatorList};
 
 use crate::pool_config::{ConfigRaw, ConfigTomlFile};
@@ -13,7 +14,7 @@ pub struct ListArgs {
         long,
         short,
         default_value_t = false,
-        help = "Also display validator list info for the stake pool"
+        help = "Also display validator list and reserve stake info for the stake pool"
     )]
     pub verbose: bool,
 
@@ -47,12 +48,21 @@ impl ListArgs {
         display.set_pool(&program_id, pool, &decoded_pool);
 
         if verbose {
-            let fetched_validator_list_data =
-                rpc.get_account_data(&validator_list_pk).await.unwrap();
+            let mut fetched = rpc
+                .get_multiple_accounts(&[validator_list_pk, decoded_pool.reserve_stake])
+                .await
+                .unwrap();
+            let fetched_reserve = fetched.pop().unwrap().unwrap();
+            let fetched_validator_list = fetched.pop().unwrap().unwrap();
+
             let decoded_validator_list = <ValidatorList as borsh::BorshDeserialize>::deserialize(
-                &mut fetched_validator_list_data.as_ref(),
+                &mut fetched_validator_list.data.as_slice(),
             )
             .unwrap();
+            display.set_reserve(&Keyed {
+                pubkey: decoded_pool.reserve_stake,
+                account: &fetched_reserve,
+            });
             display.set_validator_list(&program_id, &pool, &decoded_validator_list);
         }
 
