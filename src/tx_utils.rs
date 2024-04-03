@@ -7,6 +7,7 @@ use solana_client::{
 };
 use solana_sdk::{
     address_lookup_table::AddressLookupTableAccount,
+    commitment_config::{CommitmentConfig, CommitmentLevel},
     compute_budget::ComputeBudgetInstruction,
     hash::Hash,
     instruction::Instruction,
@@ -23,8 +24,7 @@ pub const MAX_ADD_VALIDATORS_IX_PER_TX: usize = 7;
 
 pub const MAX_REMOVE_VALIDATOR_IXS_ENUM_PER_TX: usize = 5;
 
-// this is fucking bullshit but the init transactions fail with cu exceeded otherwise
-const CU_BUFFER_RATIO: f64 = 1.5;
+const CU_BUFFER_RATIO: f64 = 1.15;
 
 pub async fn with_auto_cb_ixs(
     rpc: &RpcClient,
@@ -47,8 +47,17 @@ pub async fn with_auto_cb_ixs(
             &tx_to_sim,
             RpcSimulateTransactionConfig {
                 sig_verify: false,
-                replace_recent_blockhash: true, // must set to true or sim will error with blockhash not found
-                commitment: None,
+
+                // must set to true or sim will error with blockhash not found
+                replace_recent_blockhash: true,
+
+                // set to processed so that this works for a dependent sequence of txs before the previous tx has finalized.
+                // If not, the default commitment is finalized, and the next tx in the sequence will report an
+                // unnaturally low CU level if the sim fails because it was dependent on the prev tx's state changes,
+                commitment: Some(CommitmentConfig {
+                    commitment: CommitmentLevel::Processed,
+                }),
+
                 encoding: None,
                 accounts: None,
                 min_context_slot: None,
