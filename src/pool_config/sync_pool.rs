@@ -443,7 +443,7 @@ mod tests {
             sol_withdrawal_fee: ZERO_FEE,
             next_sol_withdrawal_fee: FutureEpochFee::None,
             // dont cares:
-            token_program_id: Pubkey::new_unique(),
+            token_program: Pubkey::new_unique(),
             pool_mint: Pubkey::new_unique(),
             validator_list: Pubkey::new_unique(),
             reserve_stake: Pubkey::new_unique(),

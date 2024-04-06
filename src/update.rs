@@ -163,7 +163,7 @@ mod tests {
             sol_withdraw_authority: None,
             sol_withdrawal_fee: ZERO_FEE,
             next_sol_withdrawal_fee: FutureEpochFee::None,
-            token_program_id: Pubkey::new_unique(),
+            token_program: Pubkey::new_unique(),
             pool_mint: Pubkey::new_unique(),
             preferred_deposit_validator_vote_address: None,
             preferred_withdraw_validator_vote_address: None,

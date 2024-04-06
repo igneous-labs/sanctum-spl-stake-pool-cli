@@ -371,10 +371,11 @@ dependencies = [
 
 [[package]]
 name = "assert_cmd"
-version = "1.0.8"
+version = "2.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c98233c6673d8601ab23e77eb38f999c51100d46c5703b17288c57fddf3a1ffe"
+checksum = "ed72493ac66d5804837f480ab3766c72bdfab91a65e565fc54fa9e42db0073a8"
 dependencies = [
+ "anstyle",
  "bstr",
  "doc-comment",
  "predicates",
@@ -681,13 +682,13 @@ checksum = "771fe0050b883fcc3ea2359b1a96bcfbc090b7116eae7c3c512c7a083fdf23d3"
 
 [[package]]
 name = "bstr"
-version = "0.2.17"
+version = "1.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba3569f383e8f1598449f1a423e72e99569137b47740b1da11ef19af3d5c3223"
+checksum = "05efc5cfd9110c8416e471df0e96702d58690178e206e61b7173706673c93706"
 dependencies = [
- "lazy_static",
  "memchr",
- "regex-automata 0.1.10",
+ "regex-automata",
+ "serde",
 ]
 
 [[package]]
@@ -2776,12 +2777,12 @@ checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
 
 [[package]]
 name = "predicates"
-version = "2.1.5"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59230a63c37f3e18569bdb90e4a89cbf5bf8b06fea0b84e65ea10cc4df47addd"
+checksum = "68b87bfd4605926cdfefc1c3b5f8fe560e3feca9d5552cf68c466d3d8236c7e8"
 dependencies = [
+ "anstyle",
  "difflib",
- "itertools",
  "predicates-core",
 ]
 
@@ -3079,15 +3080,9 @@ checksum = "c117dbdfde9c8308975b6a18d71f3f385c89461f7b3fb054288ecf2a2058ba4c"
 dependencies = [
  "aho-corasick",
  "memchr",
- "regex-automata 0.4.6",
+ "regex-automata",
  "regex-syntax",
 ]
-
-[[package]]
-name = "regex-automata"
-version = "0.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c230d73fb8d8c1b9c0b3135c5142a8acee3a0558fb8db5cf1cb65f8d7862132"
 
 [[package]]
 name = "regex-automata"
@@ -3310,7 +3305,7 @@ dependencies = [
 [[package]]
 name = "sanctum-associated-token-lib"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=b2b880b#b2b880b869cf4226ed4c190626227e1078ac8f22"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=296f521#296f52126c007f2552b9ffdb81e637cdade0aef7"
 dependencies = [
  "solana-program",
  "solana-readonly-account",
@@ -3332,8 +3327,8 @@ dependencies = [
 
 [[package]]
 name = "sanctum-solana-cli-utils"
-version = "0.2.0"
-source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=b2b880b#b2b880b869cf4226ed4c190626227e1078ac8f22"
+version = "0.3.0"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=296f521#296f52126c007f2552b9ffdb81e637cdade0aef7"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3349,8 +3344,9 @@ dependencies = [
 [[package]]
 name = "sanctum-solana-test-utils"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=b2b880b#b2b880b869cf4226ed4c190626227e1078ac8f22"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=296f521#296f52126c007f2552b9ffdb81e637cdade0aef7"
 dependencies = [
+ "assert_cmd",
  "async-trait",
  "bincode",
  "borsh 0.10.3",
@@ -3412,7 +3408,7 @@ dependencies = [
 [[package]]
 name = "sanctum-spl-stake-pool-lib"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=b2b880b#b2b880b869cf4226ed4c190626227e1078ac8f22"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=296f521#296f52126c007f2552b9ffdb81e637cdade0aef7"
 dependencies = [
  "borsh 0.10.3",
  "solana-program",
@@ -5189,7 +5185,7 @@ dependencies = [
 [[package]]
 name = "spl_associated_token_account_interface"
 version = "2.0.0"
-source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=b2b880b#b2b880b869cf4226ed4c190626227e1078ac8f22"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=296f521#296f52126c007f2552b9ffdb81e637cdade0aef7"
 dependencies = [
  "borsh 0.10.3",
  "num-derive 0.4.2",
@@ -5201,7 +5197,7 @@ dependencies = [
 [[package]]
 name = "spl_stake_pool_interface"
 version = "1.0.0"
-source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=b2b880b#b2b880b869cf4226ed4c190626227e1078ac8f22"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=296f521#296f52126c007f2552b9ffdb81e637cdade0aef7"
 dependencies = [
  "borsh 0.10.3",
  "serde",
@@ -5211,7 +5207,7 @@ dependencies = [
 [[package]]
 name = "spl_token_interface"
 version = "4.0.0"
-source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=b2b880b#b2b880b869cf4226ed4c190626227e1078ac8f22"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=296f521#296f52126c007f2552b9ffdb81e637cdade0aef7"
 dependencies = [
  "borsh 0.10.3",
  "num-derive 0.4.2",

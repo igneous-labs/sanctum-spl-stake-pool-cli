@@ -3,7 +3,7 @@ use std::{cmp::Ordering, error::Error, path::PathBuf, str::FromStr};
 use borsh::BorshDeserialize;
 use clap::Args;
 use sanctum_associated_token_lib::FindAtaAddressArgs;
-use sanctum_solana_cli_utils::{parse_pubkey_src, parse_signer, TxSendMode};
+use sanctum_solana_cli_utils::{parse_signer, PubkeySrc, TxSendMode};
 use sanctum_spl_stake_pool_lib::{CmpFee, FindDepositAuthority, FindWithdrawAuthority, ZERO_FEE};
 use solana_readonly_account::{keyed::Keyed, ReadonlyAccountOwner};
 use solana_sdk::{
@@ -86,7 +86,7 @@ impl CreatePoolArgs {
             .as_ref()
             .map(|m| m.as_ref())
             .unwrap_or(payer.as_ref());
-        let mint = parse_pubkey_src(&mint.unwrap()).unwrap().pubkey();
+        let mint = PubkeySrc::parse(&mint.unwrap()).unwrap().pubkey();
 
         let max_validators = max_validators.unwrap();
         let validators = validators.unwrap_or(Vec::new());
@@ -115,7 +115,7 @@ impl CreatePoolArgs {
         .find_ata_address()
         .0;
         let manager_fee_account = manager_fee_account
-            .map(|s| parse_pubkey_src(&s).unwrap().pubkey())
+            .map(|s| PubkeySrc::parse(&s).unwrap().pubkey())
             .unwrap_or(manager_fee_ata);
 
         let mut fetched = rpc
@@ -163,7 +163,7 @@ impl CreatePoolArgs {
             || None,
             |s| {
                 filter_default_stake_deposit_auth(
-                    parse_pubkey_src(&s).unwrap().pubkey(),
+                    PubkeySrc::parse(&s).unwrap().pubkey(),
                     &default_stake_deposit_auth,
                 )
             },
@@ -176,7 +176,7 @@ impl CreatePoolArgs {
                 preferred_deposit_validator,
                 preferred_withdraw_validator,
             ]
-            .map(|opt| opt.map(|s| parse_pubkey_src(&s).unwrap().pubkey()));
+            .map(|opt| opt.map(|s| PubkeySrc::parse(&s).unwrap().pubkey()));
 
         let cc = CreateConfig {
             mint: Keyed {
@@ -288,7 +288,7 @@ impl CreatePoolArgs {
             reserve_stake: cc.reserve.pubkey(),
             pool_mint: cc.mint.pubkey,
             manager_fee_account,
-            token_program_id: *cc.mint.owner(),
+            token_program: *cc.mint.owner(),
             epoch_fee: cc.epoch_fee.clone(),
             next_epoch_fee: FutureEpochFee::None,
             stake_deposit_fee: cc.deposit_fee.clone(),

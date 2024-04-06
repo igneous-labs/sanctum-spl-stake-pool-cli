@@ -32,7 +32,7 @@ async fn remove_only_active_validator() {
         validator_list,
         pool_mint: mint,
         reserve_stake: reserve,
-        token_program_id: spl_token_interface::ID,
+        token_program: spl_token_interface::ID,
         // vsa has some active stake in it
         total_lamports: 10_000_000_000,
         pool_token_supply: 10_000_000_000,
