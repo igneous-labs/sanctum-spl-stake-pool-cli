@@ -2037,6 +2037,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "indxvec"
+version = "1.8.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2f939f8f54f1855df393e7f758f7f2086ad3b90f41d654b2d6d7dfddc3808e9"
+
+[[package]]
 name = "instant"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2239,6 +2245,15 @@ checksum = "57d27b317e207b10f69f5e75494119e391a96f48861ae870d1da6edac98ca900"
 dependencies = [
  "cc",
  "libc",
+]
+
+[[package]]
+name = "medians"
+version = "3.0.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "881ba1880776c8b9b1cb7a5b45e0bb341df0b3fc32ef7cfc40ae059916cb4510"
+dependencies = [
+ "indxvec",
 ]
 
 [[package]]
@@ -3305,7 +3320,7 @@ dependencies = [
 [[package]]
 name = "sanctum-associated-token-lib"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=296f521#296f52126c007f2552b9ffdb81e637cdade0aef7"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=f18d601#f18d6015286faa41dc7d362113ff7d9edde699cf"
 dependencies = [
  "solana-program",
  "solana-readonly-account",
@@ -3328,7 +3343,7 @@ dependencies = [
 [[package]]
 name = "sanctum-solana-cli-utils"
 version = "0.3.0"
-source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=296f521#296f52126c007f2552b9ffdb81e637cdade0aef7"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=f18d601#f18d6015286faa41dc7d362113ff7d9edde699cf"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3338,13 +3353,27 @@ dependencies = [
  "solana-clap-utils",
  "solana-cli-config",
  "solana-client",
+ "solana-rpc-client-api",
+ "solana-sdk",
+ "solana-transaction-status",
+]
+
+[[package]]
+name = "sanctum-solana-client-utils"
+version = "0.1.0"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=f18d601#f18d6015286faa41dc7d362113ff7d9edde699cf"
+dependencies = [
+ "log",
+ "medians",
+ "solana-client",
+ "solana-rpc-client-api",
  "solana-sdk",
 ]
 
 [[package]]
 name = "sanctum-solana-test-utils"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=296f521#296f52126c007f2552b9ffdb81e637cdade0aef7"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=f18d601#f18d6015286faa41dc7d362113ff7d9edde699cf"
 dependencies = [
  "assert_cmd",
  "async-trait",
@@ -3386,6 +3415,7 @@ dependencies = [
  "sanctum-associated-token-lib",
  "sanctum-macros",
  "sanctum-solana-cli-utils",
+ "sanctum-solana-client-utils",
  "sanctum-solana-test-utils",
  "sanctum-spl-stake-pool-lib",
  "serde",
@@ -3408,7 +3438,7 @@ dependencies = [
 [[package]]
 name = "sanctum-spl-stake-pool-lib"
 version = "0.1.0"
-source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=296f521#296f52126c007f2552b9ffdb81e637cdade0aef7"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=f18d601#f18d6015286faa41dc7d362113ff7d9edde699cf"
 dependencies = [
  "borsh 0.10.3",
  "solana-program",
@@ -5185,7 +5215,7 @@ dependencies = [
 [[package]]
 name = "spl_associated_token_account_interface"
 version = "2.0.0"
-source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=296f521#296f52126c007f2552b9ffdb81e637cdade0aef7"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=f18d601#f18d6015286faa41dc7d362113ff7d9edde699cf"
 dependencies = [
  "borsh 0.10.3",
  "num-derive 0.4.2",
@@ -5197,7 +5227,7 @@ dependencies = [
 [[package]]
 name = "spl_stake_pool_interface"
 version = "1.0.0"
-source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=296f521#296f52126c007f2552b9ffdb81e637cdade0aef7"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=f18d601#f18d6015286faa41dc7d362113ff7d9edde699cf"
 dependencies = [
  "borsh 0.10.3",
  "serde",
@@ -5207,7 +5237,7 @@ dependencies = [
 [[package]]
 name = "spl_token_interface"
 version = "4.0.0"
-source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=296f521#296f52126c007f2552b9ffdb81e637cdade0aef7"
+source = "git+https://github.com/igneous-labs/sanctum-solana-utils?rev=f18d601#f18d6015286faa41dc7d362113ff7d9edde699cf"
 dependencies = [
  "borsh 0.10.3",
  "num-derive 0.4.2",

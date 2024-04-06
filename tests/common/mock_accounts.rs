@@ -141,7 +141,7 @@ pub struct ValidatorPoolStakeAccounts {
     pub transient: Option<KeyedAccount>,
 }
 
-#[allow(unused)] // TODO: remove allow(unused)
+#[allow(unused)] // TODO: remove allow(unused) once Deactivating is constructed somewhere
 #[derive(Clone, Copy, Debug)]
 pub enum TransientStakeAccountState {
     Activating,

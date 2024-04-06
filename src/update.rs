@@ -110,6 +110,7 @@ pub async fn update_pool_if_needed(
 #[cfg(test)]
 mod tests {
     use borsh::BorshSerialize;
+    use sanctum_solana_test_utils::assert_tx_with_cb_ixs_within_size_limits;
     use sanctum_spl_stake_pool_lib::{account_resolvers::UpdateValidatorListBalance, ZERO_FEE};
     use solana_readonly_account::ReadonlyAccountData;
     use solana_sdk::pubkey::Pubkey;
@@ -117,8 +118,6 @@ mod tests {
         AccountType, FutureEpochFee, Lockup, StakePool, StakeStatus,
         UpdateValidatorListBalanceIxArgs,
     };
-
-    use crate::test_utils::assert_tx_with_cu_ixs_within_size_limits;
 
     use super::*;
 
@@ -209,6 +208,6 @@ mod tests {
             )
             .unwrap();
         // size = 1186
-        assert_tx_with_cu_ixs_within_size_limits(&Pubkey::new_unique(), [ix].into_iter());
+        assert_tx_with_cb_ixs_within_size_limits(&Pubkey::new_unique(), [ix].into_iter(), &[]);
     }
 }

@@ -404,11 +404,10 @@ impl<'a> SyncPoolConfig<'a> {
 
 #[cfg(test)]
 mod tests {
+    use sanctum_solana_test_utils::assert_tx_with_cb_ixs_within_size_limits;
     use sanctum_spl_stake_pool_lib::ZERO_FEE;
     use solana_sdk::signature::Keypair;
     use spl_stake_pool_interface::{AccountType, Lockup};
-
-    use crate::test_utils::assert_tx_with_cu_ixs_within_size_limits;
 
     use super::*;
 
@@ -501,6 +500,6 @@ mod tests {
         let ixs = spc.changeset_ixs(&changeset).unwrap();
         assert_eq!(ixs.len(), WORST_CASE_IXS_LEN);
         // size = 782
-        assert_tx_with_cu_ixs_within_size_limits(&payer.pubkey(), ixs.into_iter());
+        assert_tx_with_cb_ixs_within_size_limits(&payer.pubkey(), ixs.into_iter(), &[]);
     }
 }

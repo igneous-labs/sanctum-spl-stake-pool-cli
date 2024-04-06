@@ -1,6 +1,9 @@
 use std::cmp::max;
 
-use sanctum_solana_cli_utils::{TxSendMode, TxSendingNonblockingRpcClient};
+use sanctum_solana_cli_utils::{
+    HandleTxArgs, RecentBlockhash, TxSendMode, TxSendingNonblockingRpcClient,
+};
+use sanctum_solana_client_utils::SortedSigners;
 use solana_client::{
     nonblocking::rpc_client::RpcClient, rpc_config::RpcSimulateTransactionConfig,
     rpc_response::RpcSimulateTransactionResult,
@@ -17,8 +20,6 @@ use solana_sdk::{
     signer::Signer,
     transaction::VersionedTransaction,
 };
-
-use crate::sorted_signers::SortedSigners;
 
 pub const MAX_ADD_VALIDATORS_IX_PER_TX: usize = 7;
 
@@ -89,14 +90,15 @@ pub async fn handle_tx_full(
 ) {
     let payer_pk = signers[0].pubkey();
     signers.sort_by_key(|s| s.pubkey());
-    let rbh = rpc.get_latest_blockhash().await.unwrap();
+    let RecentBlockhash { hash, .. } = rpc.get_confirmed_blockhash().await.unwrap();
     rpc.handle_tx(
         &VersionedTransaction::try_new(
-            VersionedMessage::V0(Message::try_compile(&payer_pk, ixs, luts, rbh).unwrap()),
+            VersionedMessage::V0(Message::try_compile(&payer_pk, ixs, luts, hash).unwrap()),
             &SortedSigners(signers),
         )
         .unwrap(),
         send_mode,
+        HandleTxArgs::cli_default(),
     )
     .await;
 }
@@ -105,12 +107,11 @@ pub async fn handle_tx_full(
 mod tests {
     use std::collections::HashSet;
 
+    use sanctum_solana_test_utils::assert_tx_with_cb_ixs_within_size_limits;
     use solana_sdk::{rent::Rent, signature::Keypair};
     use spl_stake_pool_interface::{StakeStatus, ValidatorStakeInfo};
 
-    use crate::{
-        pool_config::SyncValidatorListConfig, test_utils::assert_tx_with_cu_ixs_within_size_limits,
-    };
+    use crate::pool_config::SyncValidatorListConfig;
 
     use super::*;
 
@@ -140,9 +141,10 @@ mod tests {
         let add_validator_ix_chunk = iter.next().unwrap();
         assert_eq!(add_validator_ix_chunk.len(), MAX_ADD_VALIDATORS_IX_PER_TX);
         // size = 1231 WEW
-        assert_tx_with_cu_ixs_within_size_limits(
+        assert_tx_with_cb_ixs_within_size_limits(
             &payer.pubkey(),
             add_validator_ix_chunk.iter().cloned(),
+            &[],
         );
         assert!(iter.next().is_none());
     }
@@ -182,6 +184,6 @@ mod tests {
         let ixs = svlc.remove_validators_ixs(remove).unwrap();
         assert_eq!(ixs.len(), MAX_REMOVE_VALIDATOR_IXS_ENUM_PER_TX * 2);
         // size = 1184
-        assert_tx_with_cu_ixs_within_size_limits(&payer.pubkey(), ixs.into_iter());
+        assert_tx_with_cb_ixs_within_size_limits(&payer.pubkey(), ixs.into_iter(), &[]);
     }
 }
