@@ -2,16 +2,17 @@ use borsh::BorshDeserialize;
 use clap::Args;
 use sanctum_associated_token_lib::FindAtaAddressArgs;
 use sanctum_solana_cli_utils::{parse_signer, PubkeySrc};
-use sanctum_spl_stake_pool_lib::FindWithdrawAuthority;
+use sanctum_spl_stake_pool_lib::account_resolvers::DepositStakeWithSlippage;
+use solana_readonly_account::keyed::Keyed;
 use solana_sdk::{
-    stake::{
-        self,
-        state::{Authorized, StakeAuthorize, StakeStateV2},
-    },
+    stake::state::{Authorized, StakeStateV2},
     system_program,
 };
 use spl_associated_token_account_interface::CreateIdempotentKeys;
-use spl_stake_pool_interface::{StakePool, ValidatorList};
+use spl_stake_pool_interface::{
+    deposit_stake_with_slippage_ix_with_program_id, DepositStakeWithSlippageIxArgs, StakePool,
+    ValidatorList, ValidatorStakeInfo,
+};
 
 use crate::{handle_tx_full, Subcmd};
 
@@ -59,7 +60,7 @@ impl DepositStakeArgs {
         let authority = authority.map(|a| parse_signer(&a).unwrap());
         let authority = authority
             .as_ref()
-            .map_or_else(|| payer.as_ref(), |a| a.as_ref());
+            .map_or_else(|| payer.as_ref(), |authority| authority.as_ref());
 
         let [pool, stake_account] =
             [pool, stake_account].map(|s| PubkeySrc::parse(&s).unwrap().pubkey());
@@ -107,28 +108,26 @@ impl DepositStakeArgs {
 
         let maybe_fetched_authority_ata = fetched.pop().unwrap();
 
-        let mut ixs = match maybe_fetched_authority_ata {
-            Some(_) => vec![],
-            None => {
-                if !is_mint_to_authority_ata {
-                    panic!("mint_to does not exist and is not authority's ATA");
-                } else {
-                    vec![
-                        spl_associated_token_account_interface::create_idempotent_ix(
-                            CreateIdempotentKeys {
-                                funding_account: payer.pubkey(),
-                                associated_token_account: mint_to,
-                                wallet: authority.pubkey(),
-                                mint: decoded_pool.pool_mint,
-                                system_program: system_program::ID,
-                                token_program: decoded_pool.token_program,
-                            },
-                        )
-                        .unwrap(),
-                    ]
-                }
+        let mut ixs = vec![];
+        if maybe_fetched_authority_ata.is_none() {
+            if !is_mint_to_authority_ata {
+                panic!("mint_to does not exist and is not authority's ATA");
+            } else {
+                ixs.push(
+                    spl_associated_token_account_interface::create_idempotent_ix(
+                        CreateIdempotentKeys {
+                            funding_account: payer.pubkey(),
+                            associated_token_account: mint_to,
+                            wallet: authority.pubkey(),
+                            mint: decoded_pool.pool_mint,
+                            system_program: system_program::ID,
+                            token_program: decoded_pool.token_program,
+                        },
+                    )
+                    .unwrap(),
+                )
             }
-        };
+        }
 
         let fetched_validator_list = fetched.pop().unwrap().unwrap();
 
@@ -138,30 +137,45 @@ impl DepositStakeArgs {
             )
             .unwrap();
 
-        if !validators.iter().any(|v| v.vote_account_address == voter) {
-            panic!("Validator not part of stake pool");
-        }
+        let ValidatorStakeInfo {
+            validator_seed_suffix,
+            vote_account_address,
+            ..
+        } = validators
+            .iter()
+            .find(|v| v.vote_account_address == voter)
+            .expect("Validator not part of stake pool");
 
-        let (stake_pool_withdraw_auth, _bump) =
-            FindWithdrawAuthority { pool }.run_for_prog(&program_id);
+        let deposit_stake_accounts = DepositStakeWithSlippage {
+            pool: Keyed {
+                pubkey: pool,
+                account: &decoded_pool,
+            },
+            stake_depositing: Keyed {
+                pubkey: stake_account,
+                account: &decoded_stake_account,
+            },
+            mint_to,
+            referral_fee_dest: mint_to,
+        };
+        let computed_keys = deposit_stake_accounts
+            .compute_keys(&program_id, *vote_account_address, *validator_seed_suffix)
+            .unwrap();
 
-        ixs.extend([
-            stake::instruction::authorize(
-                &stake_account,
-                &authority.pubkey(),
-                &stake_pool_withdraw_auth,
-                StakeAuthorize::Staker,
-                None,
-            ),
-            stake::instruction::authorize(
-                &stake_account,
-                &authority.pubkey(),
-                &stake_pool_withdraw_auth,
-                StakeAuthorize::Withdrawer,
-                None,
-            ),
-            // TODO: deposit stake ix
-        ]);
+        ixs.extend(
+            deposit_stake_accounts
+                .stake_authorize_prefix_ixs(computed_keys.withdraw_authority_pda)
+                .unwrap(),
+        );
+        ixs.push(
+            deposit_stake_with_slippage_ix_with_program_id(
+                program_id,
+                deposit_stake_accounts.resolve_with_computed_keys(computed_keys),
+                // TODO: slippage
+                DepositStakeWithSlippageIxArgs { min_tokens_out: 0 },
+            )
+            .unwrap(),
+        );
 
         let mut signers = [payer.as_ref(), authority];
         handle_tx_full(&rpc, args.send_mode, &ixs, &[], &mut signers).await;

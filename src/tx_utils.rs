@@ -1,22 +1,17 @@
-use std::cmp::max;
-
 use sanctum_solana_cli_utils::{
     HandleTxArgs, RecentBlockhash, TxSendMode, TxSendingNonblockingRpcClient,
 };
-use sanctum_solana_client_utils::SortedSigners;
-use solana_client::{
-    nonblocking::rpc_client::RpcClient, rpc_config::RpcSimulateTransactionConfig,
-    rpc_response::RpcSimulateTransactionResult,
+use sanctum_solana_client_utils::{
+    buffer_compute_units, calc_compute_unit_price, estimate_compute_unit_limit_nonblocking,
+    to_est_cu_sim_tx, SortedSigners,
 };
+use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
     address_lookup_table::AddressLookupTableAccount,
-    commitment_config::{CommitmentConfig, CommitmentLevel},
     compute_budget::ComputeBudgetInstruction,
-    hash::Hash,
     instruction::Instruction,
     message::{v0::Message, VersionedMessage},
     pubkey::Pubkey,
-    signature::Signature,
     signer::Signer,
     transaction::VersionedTransaction,
 };
@@ -37,42 +32,16 @@ pub async fn with_auto_cb_ixs(
     if fee_limit_cb_lamports == 0 {
         return ixs;
     }
-    let message =
-        VersionedMessage::V0(Message::try_compile(payer_pk, &ixs, luts, Hash::default()).unwrap());
-    let tx_to_sim = VersionedTransaction {
-        signatures: vec![Signature::default(); message.header().num_required_signatures.into()],
-        message,
-    };
-    let RpcSimulateTransactionResult { units_consumed, .. } = rpc
-        .simulate_transaction_with_config(
-            &tx_to_sim,
-            RpcSimulateTransactionConfig {
-                sig_verify: false,
-
-                // must set to true or sim will error with blockhash not found
-                replace_recent_blockhash: true,
-
-                // set to processed so that this works for a dependent sequence of txs before the previous tx has finalized.
-                // If not, the default commitment is finalized, and the next tx in the sequence will report an
-                // unnaturally low CU level if the sim fails because it was dependent on the prev tx's state changes,
-                commitment: Some(CommitmentConfig {
-                    commitment: CommitmentLevel::Processed,
-                }),
-
-                encoding: None,
-                accounts: None,
-                min_context_slot: None,
-            },
-        )
+    let tx_to_sim = to_est_cu_sim_tx(payer_pk, &ixs, luts).unwrap();
+    let units_consumed = estimate_compute_unit_limit_nonblocking(rpc, &tx_to_sim)
         .await
-        .unwrap()
-        .value;
-    let units = ((units_consumed.unwrap() as f64) * CU_BUFFER_RATIO).ceil();
-    let lamport_per_cu = (fee_limit_cb_lamports as f64) / units;
-    let microlamports_per_cu = (lamport_per_cu * 1_000_000.0).floor();
-    let units = units as u32;
-    let microlamports_per_cu = max(1, microlamports_per_cu as u64);
-    ixs.insert(0, ComputeBudgetInstruction::set_compute_unit_limit(units));
+        .unwrap();
+    let units_consumed = buffer_compute_units(units_consumed, CU_BUFFER_RATIO);
+    let microlamports_per_cu = calc_compute_unit_price(units_consumed, fee_limit_cb_lamports);
+    ixs.insert(
+        0,
+        ComputeBudgetInstruction::set_compute_unit_limit(units_consumed),
+    );
     ixs.insert(
         0,
         ComputeBudgetInstruction::set_compute_unit_price(microlamports_per_cu),
@@ -100,7 +69,8 @@ pub async fn handle_tx_full(
         send_mode,
         HandleTxArgs::cli_default(),
     )
-    .await;
+    .await
+    .unwrap();
 }
 
 #[cfg(test)]
