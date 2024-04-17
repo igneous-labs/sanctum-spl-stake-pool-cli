@@ -5,8 +5,9 @@ use sanctum_solana_cli_utils::{parse_signer, PubkeySrc};
 use sanctum_spl_stake_pool_lib::account_resolvers::DepositStakeWithSlippage;
 use solana_readonly_account::keyed::Keyed;
 use solana_sdk::{
+    clock::Clock,
     stake::state::{Authorized, StakeStateV2},
-    system_program,
+    system_program, sysvar,
 };
 use spl_associated_token_account_interface::CreateIdempotentKeys;
 use spl_stake_pool_interface::{
@@ -14,7 +15,7 @@ use spl_stake_pool_interface::{
     ValidatorList, ValidatorStakeInfo,
 };
 
-use crate::{handle_tx_full, Subcmd};
+use crate::{handle_tx_full, update_pool_if_needed, Subcmd, UpdatePoolIfNeededArgs};
 
 #[derive(Args, Debug)]
 #[command(long_about = "Deposit an activated stake account into a stake pool")]
@@ -85,6 +86,13 @@ impl DepositStakeArgs {
             None => panic!("Stake account not delegated"),
         };
         let voter = delegation.voter_pubkey;
+
+        if let Some(preferred) = decoded_pool.preferred_deposit_validator_vote_address {
+            if preferred != voter {
+                panic!("Stake account not staked to preferred voter {preferred}");
+            }
+        }
+
         let Authorized { staker, withdrawer } = decoded_stake_account.authorized().unwrap();
         if staker != authority.pubkey() || withdrawer != authority.pubkey() {
             panic!("Stake account not owned by authority");
@@ -102,9 +110,15 @@ impl DepositStakeArgs {
         let is_mint_to_authority_ata = mint_to == authority_ata;
 
         let mut fetched = rpc
-            .get_multiple_accounts(&[validator_list_pk, authority_ata])
+            .get_multiple_accounts(&[validator_list_pk, authority_ata, sysvar::clock::ID])
             .await
             .unwrap();
+
+        let clock = fetched.pop().unwrap().unwrap();
+        let Clock {
+            epoch: current_epoch,
+            ..
+        } = bincode::deserialize(&clock.data).unwrap();
 
         let maybe_fetched_authority_ata = fetched.pop().unwrap();
 
@@ -113,6 +127,7 @@ impl DepositStakeArgs {
             if !is_mint_to_authority_ata {
                 panic!("mint_to does not exist and is not authority's ATA");
             } else {
+                eprintln!("Will create ATA {mint_to} to receive minted LSTs");
                 ixs.push(
                     spl_associated_token_account_interface::create_idempotent_ix(
                         CreateIdempotentKeys {
@@ -177,6 +192,23 @@ impl DepositStakeArgs {
             .unwrap(),
         );
 
+        update_pool_if_needed(UpdatePoolIfNeededArgs {
+            rpc: &rpc,
+            send_mode: args.send_mode,
+            payer: payer.as_ref(),
+            program_id,
+            current_epoch,
+            stake_pool: Keyed {
+                pubkey: pool,
+                account: &fetched_pool,
+            },
+            validator_list_entries: &validators,
+            fee_limit_cb: args.fee_limit_cb,
+        })
+        .await;
+
+        // TODO: calc expected amount after fees
+        eprintln!("Depositing stake account {stake_account}");
         let mut signers = [payer.as_ref(), authority];
         handle_tx_full(&rpc, args.send_mode, &ixs, &[], &mut signers).await;
     }
