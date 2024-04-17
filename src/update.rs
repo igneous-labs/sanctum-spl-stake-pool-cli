@@ -1,4 +1,7 @@
+use std::fmt::Display;
+
 use borsh::BorshDeserialize;
+use clap::ValueEnum;
 use sanctum_solana_cli_utils::TxSendMode;
 use sanctum_spl_stake_pool_lib::account_resolvers::{
     CleanupRemovedValidatorEntries, UpdateStakePoolBalance, UpdateValidatorListBalance,
@@ -16,7 +19,30 @@ use crate::tx_utils::{handle_tx_full, with_auto_cb_ixs};
 
 const MAX_VALIDATORS_TO_UPDATE_PER_TX: usize = 11;
 
-pub struct UpdatePoolIfNeededArgs<'a> {
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, ValueEnum)]
+pub enum UpdateCtrl {
+    /// Only run the update for parts of the pool that need it for this epoch
+    #[default]
+    IfNeeded,
+
+    /// Force update the pool account only (not the validator list), even if it has been updated for this epoch
+    ForcePool,
+
+    /// Force update both the pool account and the entire validator list, even if the pool has been updated for this epoch
+    ForceAll,
+}
+
+impl Display for UpdateCtrl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::IfNeeded => f.write_str("if-needed"),
+            Self::ForcePool => f.write_str("force-pool"),
+            Self::ForceAll => f.write_str("force-all"),
+        }
+    }
+}
+
+pub struct UpdatePoolArgs<'a> {
     pub rpc: &'a RpcClient,
     pub send_mode: TxSendMode,
     pub payer: &'a (dyn Signer + 'static),
@@ -25,11 +51,12 @@ pub struct UpdatePoolIfNeededArgs<'a> {
     pub stake_pool: Keyed<&'a Account>,
     pub validator_list_entries: &'a [ValidatorStakeInfo],
     pub fee_limit_cb: u64,
+    pub ctrl: UpdateCtrl,
 }
 
 // ignores entries already updated for this epoch
-pub async fn update_pool_if_needed(
-    UpdatePoolIfNeededArgs {
+pub async fn update_pool(
+    UpdatePoolArgs {
         rpc,
         send_mode,
         payer,
@@ -38,51 +65,59 @@ pub async fn update_pool_if_needed(
         stake_pool,
         validator_list_entries,
         fee_limit_cb,
-    }: UpdatePoolIfNeededArgs<'_>,
+        ctrl,
+    }: UpdatePoolArgs<'_>,
 ) {
     let sp = StakePool::deserialize(&mut stake_pool.account.data.as_slice()).unwrap();
-    if sp.last_update_epoch >= current_epoch {
+    let is_updated_for_curr_epoch = sp.last_update_epoch >= current_epoch;
+    if is_updated_for_curr_epoch && ctrl == UpdateCtrl::IfNeeded {
         eprintln!("Update not required");
         return;
     }
-    eprintln!("Update required");
-    let uvlb = UpdateValidatorListBalance { stake_pool };
-    // just do it sequentially
-    for (i, chunk) in validator_list_entries
-        .chunks(MAX_VALIDATORS_TO_UPDATE_PER_TX)
-        .enumerate()
-    {
-        if chunk
-            .iter()
-            .all(|vsi| vsi.last_update_epoch >= current_epoch)
+    eprintln!("Updating pool");
+
+    // Update validator list:
+    if !is_updated_for_curr_epoch || ctrl == UpdateCtrl::ForceAll {
+        let uvlb = UpdateValidatorListBalance { stake_pool };
+        // just do the validator list sequentially
+        for (i, chunk) in validator_list_entries
+            .chunks(MAX_VALIDATORS_TO_UPDATE_PER_TX)
+            .enumerate()
         {
-            continue;
+            if chunk
+                .iter()
+                .all(|vsi| vsi.last_update_epoch >= current_epoch)
+            {
+                continue;
+            }
+            let start_index = i * MAX_VALIDATORS_TO_UPDATE_PER_TX;
+            let ixs = vec![uvlb
+                .full_ix_from_validator_slice(
+                    program_id,
+                    chunk,
+                    UpdateValidatorListBalanceIxArgs {
+                        start_index: start_index.try_into().unwrap(),
+                        no_merge: false,
+                    },
+                )
+                .unwrap()];
+            let ixs = match send_mode {
+                TxSendMode::DumpMsg => ixs,
+                _ => with_auto_cb_ixs(rpc, &payer.pubkey(), ixs, &[], fee_limit_cb).await,
+            };
+            eprintln!(
+                "Updating validator list [{}..{}]",
+                start_index,
+                std::cmp::min(
+                    start_index + MAX_VALIDATORS_TO_UPDATE_PER_TX,
+                    validator_list_entries.len()
+                )
+            );
+            handle_tx_full(rpc, send_mode, &ixs, &[], &mut [payer]).await;
         }
-        let start_index = i * MAX_VALIDATORS_TO_UPDATE_PER_TX;
-        let ixs = vec![uvlb
-            .full_ix_from_validator_slice(
-                program_id,
-                chunk,
-                UpdateValidatorListBalanceIxArgs {
-                    start_index: start_index.try_into().unwrap(),
-                    no_merge: false,
-                },
-            )
-            .unwrap()];
-        let ixs = match send_mode {
-            TxSendMode::DumpMsg => ixs,
-            _ => with_auto_cb_ixs(rpc, &payer.pubkey(), ixs, &[], fee_limit_cb).await,
-        };
-        eprintln!(
-            "Updating validator list [{}..{}]",
-            start_index,
-            std::cmp::min(
-                start_index + MAX_VALIDATORS_TO_UPDATE_PER_TX,
-                validator_list_entries.len()
-            )
-        );
-        handle_tx_full(rpc, send_mode, &ixs, &[], &mut [payer]).await;
     }
+
+    // Update pool:
     let final_ixs = vec![
         update_stake_pool_balance_ix_with_program_id(
             program_id,

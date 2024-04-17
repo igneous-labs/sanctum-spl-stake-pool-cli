@@ -12,9 +12,7 @@ use solana_sdk::{
 use spl_associated_token_account_interface::CreateIdempotentKeys;
 use spl_stake_pool_interface::{StakePool, ValidatorList, ValidatorStakeInfo};
 
-use crate::{
-    handle_tx_full, update_pool_if_needed, with_auto_cb_ixs, Subcmd, UpdatePoolIfNeededArgs,
-};
+use crate::{handle_tx_full, update_pool, with_auto_cb_ixs, Subcmd, UpdateCtrl, UpdatePoolArgs};
 
 #[derive(Args, Debug)]
 #[command(long_about = "Deposit an activated stake account into a stake pool")]
@@ -184,7 +182,7 @@ impl DepositStakeArgs {
                 .unwrap(),
         );
 
-        update_pool_if_needed(UpdatePoolIfNeededArgs {
+        update_pool(UpdatePoolArgs {
             rpc: &rpc,
             send_mode: args.send_mode,
             payer: payer.as_ref(),
@@ -196,6 +194,7 @@ impl DepositStakeArgs {
             },
             validator_list_entries: &validators,
             fee_limit_cb: args.fee_limit_cb,
+            ctrl: UpdateCtrl::IfNeeded,
         })
         .await;
 

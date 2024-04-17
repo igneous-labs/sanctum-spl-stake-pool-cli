@@ -23,9 +23,7 @@ use spl_stake_pool_interface::{
     WithdrawStakeWithSlippageIxArgs,
 };
 
-use crate::{
-    handle_tx_full, update_pool_if_needed, with_auto_cb_ixs, Subcmd, UpdatePoolIfNeededArgs,
-};
+use crate::{handle_tx_full, update_pool, with_auto_cb_ixs, Subcmd, UpdateCtrl, UpdatePoolArgs};
 
 #[derive(Args, Debug)]
 #[command(long_about = "Withdraws stake from a stake pool")]
@@ -197,7 +195,7 @@ impl WithdrawStakeArgs {
             ..
         } = bincode::deserialize(&clock.data).unwrap();
 
-        update_pool_if_needed(UpdatePoolIfNeededArgs {
+        update_pool(UpdatePoolArgs {
             rpc: &rpc,
             send_mode: args.send_mode,
             payer: payer.as_ref(),
@@ -209,6 +207,7 @@ impl WithdrawStakeArgs {
             },
             validator_list_entries: &validators,
             fee_limit_cb: args.fee_limit_cb,
+            ctrl: UpdateCtrl::IfNeeded,
         })
         .await;
 
