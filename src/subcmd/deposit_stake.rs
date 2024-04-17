@@ -1,7 +1,7 @@
 use borsh::BorshDeserialize;
 use clap::Args;
 use sanctum_associated_token_lib::FindAtaAddressArgs;
-use sanctum_solana_cli_utils::{parse_signer, PubkeySrc};
+use sanctum_solana_cli_utils::{parse_signer, PubkeySrc, TxSendMode};
 use sanctum_spl_stake_pool_lib::account_resolvers::DepositStakeWithSlippage;
 use solana_readonly_account::keyed::Keyed;
 use solana_sdk::{
@@ -10,12 +10,11 @@ use solana_sdk::{
     system_program, sysvar,
 };
 use spl_associated_token_account_interface::CreateIdempotentKeys;
-use spl_stake_pool_interface::{
-    deposit_stake_with_slippage_ix_with_program_id, DepositStakeWithSlippageIxArgs, StakePool,
-    ValidatorList, ValidatorStakeInfo,
-};
+use spl_stake_pool_interface::{StakePool, ValidatorList, ValidatorStakeInfo};
 
-use crate::{handle_tx_full, update_pool_if_needed, Subcmd, UpdatePoolIfNeededArgs};
+use crate::{
+    handle_tx_full, update_pool_if_needed, with_auto_cb_ixs, Subcmd, UpdatePoolIfNeededArgs,
+};
 
 #[derive(Args, Debug)]
 #[command(long_about = "Deposit an activated stake account into a stake pool")]
@@ -173,23 +172,16 @@ impl DepositStakeArgs {
             mint_to,
             referral_fee_dest: mint_to,
         };
-        let computed_keys = deposit_stake_accounts
-            .compute_keys(&program_id, *vote_account_address, *validator_seed_suffix)
-            .unwrap();
 
         ixs.extend(
             deposit_stake_accounts
-                .stake_authorize_prefix_ixs(computed_keys.withdraw_authority_pda)
+                .full_ix_seq(
+                    &program_id,
+                    *vote_account_address,
+                    *validator_seed_suffix,
+                    0,
+                ) // TODO: min_token_outs = 0 right now, need to handle slippage
                 .unwrap(),
-        );
-        ixs.push(
-            deposit_stake_with_slippage_ix_with_program_id(
-                program_id,
-                deposit_stake_accounts.resolve_with_computed_keys(computed_keys),
-                // TODO: slippage
-                DepositStakeWithSlippageIxArgs { min_tokens_out: 0 },
-            )
-            .unwrap(),
         );
 
         update_pool_if_needed(UpdatePoolIfNeededArgs {
@@ -209,6 +201,10 @@ impl DepositStakeArgs {
 
         // TODO: calc expected amount after fees
         eprintln!("Depositing stake account {stake_account}");
+        let ixs = match args.send_mode {
+            TxSendMode::DumpMsg => ixs,
+            _ => with_auto_cb_ixs(&rpc, &payer.pubkey(), ixs, &[], args.fee_limit_cb).await,
+        };
         let mut signers = [payer.as_ref(), authority];
         handle_tx_full(&rpc, args.send_mode, &ixs, &[], &mut signers).await;
     }

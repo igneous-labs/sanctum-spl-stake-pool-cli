@@ -5,7 +5,7 @@ use clap::{
 use rand::Rng;
 use sanctum_associated_token_lib::FindAtaAddressArgs;
 use sanctum_solana_cli_utils::{
-    parse_signer, PubkeySrc, TokenAmt, TokenAmtOrAll, TokenAmtOrAllParser,
+    parse_signer, PubkeySrc, TokenAmt, TokenAmtOrAll, TokenAmtOrAllParser, TxSendMode,
 };
 use sanctum_spl_stake_pool_lib::account_resolvers::WithdrawStakeWithSlippage;
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -23,7 +23,9 @@ use spl_stake_pool_interface::{
     WithdrawStakeWithSlippageIxArgs,
 };
 
-use crate::{handle_tx_full, update_pool_if_needed, Subcmd, UpdatePoolIfNeededArgs};
+use crate::{
+    handle_tx_full, update_pool_if_needed, with_auto_cb_ixs, Subcmd, UpdatePoolIfNeededArgs,
+};
 
 #[derive(Args, Debug)]
 #[command(long_about = "Withdraws stake from a stake pool")]
@@ -231,33 +233,31 @@ impl WithdrawStakeArgs {
             vsi.validator_seed_suffix,
         );
         let mut signers = [payer.as_ref(), authority];
-        handle_tx_full(
-            &rpc,
-            args.send_mode,
-            &[
-                system_instruction::create_account_with_seed(
-                    &payer.pubkey(),
-                    &split_to,
-                    &authority.pubkey(),
-                    &seed,
-                    rent.minimum_balance(StakeStateV2::size_of()),
-                    StakeStateV2::size_of() as u64,
-                    &stake::program::ID,
-                ),
-                withdraw_stake_with_slippage_ix_with_program_id(
-                    program_id,
-                    resolve.resolve_with_computed_keys(computed_keys),
-                    WithdrawStakeWithSlippageIxArgs {
-                        pool_tokens_in: amt,
-                        min_lamports_out: 0, // TODO: slippage
-                    },
-                )
-                .unwrap(),
-            ],
-            &[],
-            &mut signers,
-        )
-        .await;
+        let ixs = vec![
+            system_instruction::create_account_with_seed(
+                &payer.pubkey(),
+                &split_to,
+                &authority.pubkey(),
+                &seed,
+                rent.minimum_balance(StakeStateV2::size_of()),
+                StakeStateV2::size_of() as u64,
+                &stake::program::ID,
+            ),
+            withdraw_stake_with_slippage_ix_with_program_id(
+                program_id,
+                resolve.resolve_with_computed_keys(computed_keys),
+                WithdrawStakeWithSlippageIxArgs {
+                    pool_tokens_in: amt,
+                    min_lamports_out: 0, // TODO: slippage
+                },
+            )
+            .unwrap(),
+        ];
+        let ixs = match args.send_mode {
+            TxSendMode::DumpMsg => ixs,
+            _ => with_auto_cb_ixs(&rpc, &payer.pubkey(), ixs, &[], args.fee_limit_cb).await,
+        };
+        handle_tx_full(&rpc, args.send_mode, &ixs, &[], &mut signers).await;
     }
 }
 
