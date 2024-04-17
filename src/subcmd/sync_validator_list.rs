@@ -2,7 +2,7 @@ use std::{path::PathBuf, str::FromStr};
 
 use borsh::BorshDeserialize;
 use clap::Args;
-use sanctum_solana_cli_utils::{parse_pubkey_src, parse_signer, TxSendMode};
+use sanctum_solana_cli_utils::{parse_signer, PubkeySrc, TxSendMode};
 use solana_readonly_account::keyed::Keyed;
 use solana_sdk::{clock::Clock, pubkey::Pubkey, rent::Rent, sysvar};
 use spl_stake_pool_interface::{StakePool, ValidatorList};
@@ -16,7 +16,8 @@ use crate::{
         handle_tx_full, with_auto_cb_ixs, MAX_ADD_VALIDATORS_IX_PER_TX,
         MAX_REMOVE_VALIDATOR_IXS_ENUM_PER_TX,
     },
-    update::{update_pool_if_needed, UpdatePoolIfNeededArgs},
+    update::{update_pool, UpdatePoolArgs},
+    UpdateCtrl,
 };
 
 use super::Subcmd;
@@ -57,9 +58,9 @@ impl SyncValidatorListArgs {
             .map_or_else(|| payer.as_ref(), |s| s.as_ref());
         let [preferred_deposit_validator, preferred_withdraw_validator] =
             [preferred_deposit_validator, preferred_withdraw_validator]
-                .map(|opt| opt.map(|s| parse_pubkey_src(&s).unwrap().pubkey()));
+                .map(|opt| opt.map(|s| PubkeySrc::parse(&s).unwrap().pubkey()));
 
-        let pool = parse_pubkey_src(pool.as_ref().unwrap()).unwrap().pubkey();
+        let pool = PubkeySrc::parse(pool.as_ref().unwrap()).unwrap().pubkey();
 
         let mut fetched = rpc
             .get_multiple_accounts(&[pool, sysvar::clock::ID, sysvar::rent::ID])
@@ -81,7 +82,7 @@ impl SyncValidatorListArgs {
         } = ValidatorList::deserialize(&mut validator_list_acc.data.as_slice()).unwrap();
 
         // need to update first to be able to add/remove validators
-        update_pool_if_needed(UpdatePoolIfNeededArgs {
+        update_pool(UpdatePoolArgs {
             rpc: &rpc,
             send_mode: args.send_mode,
             payer: payer.as_ref(),
@@ -93,6 +94,7 @@ impl SyncValidatorListArgs {
             },
             validator_list_entries: &old_validators,
             fee_limit_cb: args.fee_limit_cb,
+            ctrl: UpdateCtrl::IfNeeded,
         })
         .await;
 

@@ -9,13 +9,24 @@ use solana_readonly_account::keyed::Keyed;
 use solana_sdk::{clock::Clock, pubkey::Pubkey, sysvar};
 use spl_stake_pool_interface::{StakePool, ValidatorList};
 
-use crate::update::{update_pool_if_needed, UpdatePoolIfNeededArgs};
+use crate::{
+    update::{update_pool, UpdatePoolArgs},
+    UpdateCtrl,
+};
 
 use super::Subcmd;
 
 #[derive(Args, Debug)]
 #[command(long_about = "Run the complete epoch update crank for a stake pool")]
 pub struct UpdateArgs {
+    #[arg(
+        long,
+        short,
+        help = "How to run the update",
+        default_value_t = UpdateCtrl::IfNeeded,
+    )]
+    pub ctrl: UpdateCtrl,
+
     #[arg(
         help = "Pubkey of the pool to update",
         value_parser = StringValueParser::new().try_map(|s| Pubkey::from_str(&s)),
@@ -25,7 +36,7 @@ pub struct UpdateArgs {
 
 impl UpdateArgs {
     pub async fn run(args: crate::Args) {
-        let Self { pool } = match args.subcmd {
+        let Self { pool, ctrl } = match args.subcmd {
             Subcmd::Update(a) => a,
             _ => unreachable!(),
         };
@@ -49,7 +60,7 @@ impl UpdateArgs {
         let ValidatorList { validators, .. } =
             ValidatorList::deserialize(&mut validator_list_acc.data.as_slice()).unwrap();
 
-        update_pool_if_needed(UpdatePoolIfNeededArgs {
+        update_pool(UpdatePoolArgs {
             rpc: &rpc,
             send_mode: args.send_mode,
             payer: payer.as_ref(),
@@ -61,6 +72,7 @@ impl UpdateArgs {
             },
             validator_list_entries: &validators,
             fee_limit_cb: args.fee_limit_cb,
+            ctrl,
         })
         .await;
     }

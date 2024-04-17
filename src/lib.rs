@@ -3,7 +3,6 @@
 mod luts;
 mod parse;
 mod pool_config;
-mod sorted_signers;
 mod subcmd;
 mod tx_utils;
 mod update;
@@ -13,15 +12,9 @@ pub use luts::*;
 pub use parse::*;
 pub use pool_config::*;
 use sanctum_solana_cli_utils::{ConfigWrapper, TxSendMode};
-pub use sorted_signers::*;
 pub use subcmd::*;
 pub use tx_utils::*;
 pub use update::*;
-
-#[cfg(test)]
-mod test_utils;
-#[cfg(test)]
-pub use test_utils::*;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about = "Sanctum SPL Stake Pool CLI")]

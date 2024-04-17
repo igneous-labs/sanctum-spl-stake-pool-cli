@@ -53,12 +53,12 @@ impl ConfigRaw {
             next_sol_withdrawal_fee,
             last_epoch_pool_token_supply,
             last_epoch_total_lamports,
-            token_program_id,
+            token_program,
             ..
         }: &StakePool,
     ) {
         self.mint = Some(pool_mint.to_string());
-        self.token_program = Some(token_program_id.to_string());
+        self.token_program = Some(token_program.to_string());
         self.validator_list = Some(validator_list.to_string());
         self.reserve = Some(ReserveConfigRaw::from_pk(reserve_stake));
         self.manager = Some(manager.to_string());

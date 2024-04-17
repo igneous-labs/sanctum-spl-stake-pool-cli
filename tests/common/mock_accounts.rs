@@ -74,7 +74,7 @@ pub fn add_all_stake_pool_accounts(
     if validator_args.len() != validator_list.validators.len() {
         panic!("transient_states len does not match validator list len");
     }
-    if stake_pool.token_program_id != spl_token_interface::ID {
+    if stake_pool.token_program != spl_token_interface::ID {
         panic!("Only support tokenkeg progrm for now");
     }
     let PoolArgs { program, pool, .. } = pool_args;
@@ -141,7 +141,7 @@ pub struct ValidatorPoolStakeAccounts {
     pub transient: Option<KeyedAccount>,
 }
 
-#[allow(unused)] // TODO: remove allow(unused)
+#[allow(unused)] // TODO: remove allow(unused) once Deactivating is constructed somewhere
 #[derive(Clone, Copy, Debug)]
 pub enum TransientStakeAccountState {
     Activating,

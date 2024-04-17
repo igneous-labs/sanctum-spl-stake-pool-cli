@@ -1,5 +1,5 @@
 use clap::Args;
-use sanctum_solana_cli_utils::parse_pubkey_src;
+use sanctum_solana_cli_utils::PubkeySrc;
 use solana_readonly_account::keyed::Keyed;
 use spl_stake_pool_interface::{StakePool, ValidatorList};
 
@@ -31,7 +31,7 @@ impl ListArgs {
             _ => unreachable!(),
         };
 
-        let pool = parse_pubkey_src(&pool).unwrap().pubkey();
+        let pool = PubkeySrc::parse(&pool).unwrap().pubkey();
         let rpc = args.config.nonblocking_rpc_client();
 
         let mut display = ConfigRaw::default();

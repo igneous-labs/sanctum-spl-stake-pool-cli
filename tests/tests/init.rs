@@ -1,6 +1,9 @@
 use borsh::BorshDeserialize;
 use sanctum_associated_token_lib::FindAtaAddressArgs;
-use sanctum_solana_test_utils::{test_fixtures_dir, ExtendedBanksClient};
+use sanctum_solana_test_utils::{
+    cli::{assert_all_txs_success_nonempty, ExtendedCommand},
+    test_fixtures_dir, ExtendedBanksClient,
+};
 use sanctum_spl_stake_pool_lib::FindDepositAuthority;
 use solana_program_test::ProgramTest;
 use solana_sdk::{signature::read_keypair_file, signer::Signer};
@@ -9,8 +12,8 @@ use spl_stake_pool_interface::{
 };
 
 use crate::common::{
-    assert_all_txs_success_nonempty, dummy_sol_deposit_auth, dummy_sol_withdraw_auth, exec_b64_txs,
-    setup_init_manager_payer, shinobi_vote, zeta_vote,
+    dummy_sol_deposit_auth, dummy_sol_withdraw_auth, setup_init_manager_payer, shinobi_vote,
+    zeta_vote,
 };
 
 #[tokio::test(flavor = "multi_thread")]
@@ -35,7 +38,7 @@ async fn init_basic_manager_payer_same() {
     cmd.arg("create-pool")
         .arg(test_fixtures_dir().join("example-init-pool-config.toml"));
 
-    let exec_res = exec_b64_txs(&mut cmd, &mut bc).await;
+    let exec_res = cmd.exec_b64_txs(&mut bc).await;
     assert_all_txs_success_nonempty(&exec_res);
 
     let stake_pool: StakePool =

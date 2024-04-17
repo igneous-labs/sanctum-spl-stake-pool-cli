@@ -178,12 +178,11 @@ impl<'a, T: ReadonlyAccountOwner + ReadonlyAccountData> CreateConfig<'a, T> {
 mod tests {
     use sanctum_associated_token_lib::FindAtaAddressArgs;
     use sanctum_solana_test_utils::{
+        assert_tx_with_cb_ixs_within_size_limits,
         token::{tokenkeg::mock_tokenkeg_mint, MockMintArgs},
         IntoAccount,
     };
     use solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer};
-
-    use crate::test_utils::assert_tx_with_cu_ixs_within_size_limits;
 
     use super::*;
 
@@ -242,9 +241,10 @@ mod tests {
             rent: &Rent::default(),
         };
 
-        assert_tx_with_cu_ixs_within_size_limits(
+        assert_tx_with_cb_ixs_within_size_limits(
             &payer.pubkey(),
             config.initialize_tx_ixs().unwrap().into_iter(),
+            &[],
         );
     }
 }

@@ -1,5 +1,8 @@
 use borsh::BorshDeserialize;
-use sanctum_solana_test_utils::{test_fixtures_dir, ExtendedBanksClient, ExtendedProgramTest};
+use sanctum_solana_test_utils::{
+    cli::{assert_all_txs_success_nonempty, ExtendedCommand},
+    test_fixtures_dir, ExtendedBanksClient, ExtendedProgramTest,
+};
 use sanctum_spl_stake_pool_cli::ConfigRaw;
 use sanctum_spl_stake_pool_lib::{lamports_for_new_vsa, FindWithdrawAuthority, ZERO_FEE};
 use solana_program_test::ProgramTest;
@@ -10,9 +13,9 @@ use spl_stake_pool_interface::{
 };
 
 use crate::common::{
-    add_all_stake_pool_accounts, add_spl_stake_pool_prog, add_vote_accounts,
-    assert_all_txs_success_nonempty, exec_b64_txs, setup, tmp_config_file, zeta_vote, PoolArgs,
-    PoolKeys, TransientStakeAccountState, ValidatorArgs, SPL_STAKE_POOL_LAST_UPGRADE_EPOCH,
+    add_all_stake_pool_accounts, add_spl_stake_pool_prog, add_vote_accounts, setup,
+    tmp_config_file, zeta_vote, PoolArgs, PoolKeys, TransientStakeAccountState, ValidatorArgs,
+    SPL_STAKE_POOL_LAST_UPGRADE_EPOCH,
 };
 
 #[tokio::test(flavor = "multi_thread")]
@@ -32,7 +35,7 @@ async fn remove_only_active_validator() {
         validator_list,
         pool_mint: mint,
         reserve_stake: reserve,
-        token_program_id: spl_token_interface::ID,
+        token_program: spl_token_interface::ID,
         // vsa has some active stake in it
         total_lamports: 10_000_000_000,
         pool_token_supply: 10_000_000_000,
@@ -113,7 +116,7 @@ async fn remove_only_active_validator() {
 
     cmd.arg("sync-validator-list").arg(cfg_file.path());
 
-    let exec_res = exec_b64_txs(&mut cmd, &mut bc).await;
+    let exec_res = cmd.exec_b64_txs(&mut bc).await;
     assert_all_txs_success_nonempty(&exec_res);
 
     let ValidatorList { validators, .. } =

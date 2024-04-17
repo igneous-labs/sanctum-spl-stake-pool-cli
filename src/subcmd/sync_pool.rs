@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use borsh::BorshDeserialize;
 use clap::Args;
-use sanctum_solana_cli_utils::{parse_pubkey_src, parse_signer, TxSendMode};
+use sanctum_solana_cli_utils::{parse_signer, PubkeySrc, TxSendMode};
 use spl_stake_pool_interface::StakePool;
 
 use crate::{
@@ -48,7 +48,7 @@ impl SyncPoolArgs {
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();
 
-        let pool = parse_pubkey_src(pool.as_ref().unwrap()).unwrap().pubkey();
+        let pool = PubkeySrc::parse(pool.as_ref().unwrap()).unwrap().pubkey();
 
         let fetched_pool = rpc.get_account(&pool).await.unwrap();
         let program_id = fetched_pool.owner;
@@ -83,13 +83,13 @@ impl SyncPoolArgs {
         .map(|(file_opt, stake_pool_val)| {
             file_opt.map_or_else(
                 || stake_pool_val,
-                |s| parse_pubkey_src(&s).unwrap().pubkey(),
+                |s| PubkeySrc::parse(&s).unwrap().pubkey(),
             )
         });
 
         let [sol_deposit_auth, sol_withdraw_auth, stake_deposit_auth] =
             [sol_deposit_auth, sol_withdraw_auth, stake_deposit_auth]
-                .map(|string_opt| string_opt.map(|s| parse_pubkey_src(&s).unwrap().pubkey()));
+                .map(|string_opt| string_opt.map(|s| PubkeySrc::parse(&s).unwrap().pubkey()));
 
         let [sol_deposit_referral_fee, stake_deposit_referral_fee] = [
             (sol_deposit_referral_fee, stake_pool.sol_referral_fee),
