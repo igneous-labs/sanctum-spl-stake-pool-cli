@@ -23,13 +23,13 @@ tokio = { version = "^1", features = ["rt-multi-thread"] }
 toml = "^0.8" # borsh-derive 0.9 -> proc-macro-crate 0.1.5 -> toml ^0.5, but 0.5 has the ValueAfterTable bug so we're getting 2 toml vers
 
 # sanctum-solana-utils
-spl_associated_token_account_interface = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "9c420c6" }
-spl_stake_pool_interface = { features = ["serde"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "9c420c6" }
-spl_token_interface = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "9c420c6" }
-sanctum-associated-token-lib = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "9c420c6" }
-sanctum-solana-cli-utils = { features = ["clap"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "9c420c6" }
-sanctum-solana-client-utils = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "9c420c6" }
-sanctum-spl-stake-pool-lib = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "9c420c6" }
+spl_associated_token_account_interface = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "0ecf267" }
+spl_stake_pool_interface = { features = ["serde"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "0ecf267" }
+spl_token_interface = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "0ecf267" }
+sanctum-associated-token-lib = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "0ecf267" }
+sanctum-solana-cli-utils = { features = ["clap"], git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "0ecf267" }
+sanctum-solana-client-utils = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "0ecf267" }
+sanctum-spl-stake-pool-lib = { git = "https://github.com/igneous-labs/sanctum-solana-utils", rev = "0ecf267" }
 
 # solana
 # keeping to 1.17.6 for now because later versions have some shit with the LoadedPrograms cache not loading
@@ -48,7 +48,7 @@ tempfile = "^3"
 
 [dev-dependencies.sanctum-solana-test-utils]
 git = "https://github.com/igneous-labs/sanctum-solana-utils"
-rev = "9c420c6"
+rev = "0ecf267"
 features = [
     "banks-rpc-server",
     "cli",
