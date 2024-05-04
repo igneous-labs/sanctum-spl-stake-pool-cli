@@ -20,7 +20,9 @@ pub const MAX_ADD_VALIDATORS_IX_PER_TX: usize = 7;
 
 pub const MAX_REMOVE_VALIDATOR_IXS_ENUM_PER_TX: usize = 5;
 
-const CU_BUFFER_RATIO: f64 = 1.15;
+const CU_BUFFER_RATIO: f64 = 1.1;
+
+const CUS_REQUIRED_FOR_SET_CU_LIMIT_IXS: u32 = 300;
 
 pub async fn with_auto_cb_ixs(
     rpc: &RpcClient,
@@ -36,7 +38,8 @@ pub async fn with_auto_cb_ixs(
     let units_consumed = estimate_compute_unit_limit_nonblocking(rpc, &tx_to_sim)
         .await
         .unwrap();
-    let units_consumed = buffer_compute_units(units_consumed, CU_BUFFER_RATIO);
+    let units_consumed = buffer_compute_units(units_consumed, CU_BUFFER_RATIO)
+        .saturating_add(CUS_REQUIRED_FOR_SET_CU_LIMIT_IXS);
     let microlamports_per_cu = calc_compute_unit_price(units_consumed, fee_limit_cb_lamports);
     ixs.insert(
         0,
