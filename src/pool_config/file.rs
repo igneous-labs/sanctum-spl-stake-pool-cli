@@ -1,5 +1,6 @@
-use std::{fs::read_to_string, num::NonZeroU32, path::Path};
+use std::{error::Error, fs::read_to_string, num::NonZeroU32, path::Path};
 
+use sanctum_solana_cli_utils::PubkeySrc;
 use sanctum_spl_stake_pool_lib::{
     FindTransientStakeAccount, FindTransientStakeAccountArgs, FindValidatorStakeAccount,
     FindValidatorStakeAccountArgs,
@@ -130,7 +131,7 @@ struct SyncDelegationConfigTomlFile {
 pub struct SyncDelegationConfigToml {
     pub pool: String,
     pub staker: Option<String>,
-    pub validators: Option<Vec<ValidatorDelegation>>, // put this last so it gets outputted last in toml Serialize
+    pub validators: Option<Vec<ValidatorDelegationRaw>>, // put this last so it gets outputted last in toml Serialize
 }
 
 impl SyncDelegationConfigToml {
@@ -145,12 +146,31 @@ impl SyncDelegationConfigToml {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub struct ValidatorDelegation {
+pub struct ValidatorDelegationRaw {
     pub vote: String,
     pub target: ValidatorDelegationTarget,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug)]
+pub struct ValidatorDelegation {
+    pub vote: Pubkey,
+    pub target: ValidatorDelegationTarget,
+}
+
+impl TryFrom<ValidatorDelegationRaw> for ValidatorDelegation {
+    type Error = Box<dyn Error>;
+
+    fn try_from(
+        ValidatorDelegationRaw { vote, target }: ValidatorDelegationRaw,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            target,
+            vote: PubkeySrc::parse(&vote)?.pubkey(),
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ValidatorDelegationTarget {
     Lamports(u64),
