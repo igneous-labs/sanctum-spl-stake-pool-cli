@@ -1,0 +1,5 @@
+[pool]
+pool = "./test-fixtures/example-pool-keypair.json"
+
+old-staker = "./test-fixtures/example-staker-keypair.json" # defaults to config wallet if not specified
+staker = "./test-fixtures/example-new-staker-keypair.json" # defaults to config wallet if not specified
