@@ -1,0 +1,12 @@
+[pool]
+pool = "9hRBuRJs1du6T2GGhW9AtUovidvcinMPm674vHNsgy61"
+staker = "./test-fixtures/example-staker-keypair.json" # defaults to config wallet if not specified
+
+[[pool.validators]]
+vote = "FnAPJkzf19s87sm24Qhv6bHZMZvZ43gjNUBRgjwXpD4v"
+[pool.validators.target]
+lamports = 100
+
+# [[pool.validators]]
+# vote = "BLADE1qNA1uNjRgER6DtUFf7FU3c1TWLLdpPeEcKatZ2"
+# target = "remainder"

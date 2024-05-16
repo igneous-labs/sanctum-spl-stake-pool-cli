@@ -119,6 +119,44 @@ impl ValidatorConfigRaw {
     }
 }
 
+/// Used to deserialize input config toml files
+#[derive(Debug, Deserialize, Serialize)]
+struct SyncDelegationConfigTomlFile {
+    pub pool: SyncDelegationConfigToml,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct SyncDelegationConfigToml {
+    pub pool: String,
+    pub staker: Option<String>,
+    pub validators: Option<Vec<ValidatorDelegation>>, // put this last so it gets outputted last in toml Serialize
+}
+
+impl SyncDelegationConfigToml {
+    pub fn read_from_path<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
+        // toml crate only handles strings, not io::Read lol
+        let s = read_to_string(path)?;
+        let SyncDelegationConfigTomlFile { pool } =
+            toml::from_str(&s).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        Ok(pool)
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ValidatorDelegation {
+    pub vote: String,
+    pub target: ValidatorDelegationTarget,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ValidatorDelegationTarget {
+    Lamports(u64),
+    // Remainder, TODO: more variants for more strategies
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ReserveConfigRaw {
@@ -196,5 +234,15 @@ mod tests {
         );
 
         eprintln!("{}", ConfigTomlFile { pool: &res });
+    }
+
+    #[test]
+    fn deser_example_validator_delegation_config() {
+        let example_path = test_fixtures_dir().join("example-sync-delegation-config.toml");
+        let pool = SyncDelegationConfigToml::read_from_path(example_path).unwrap();
+        eprintln!(
+            "{}",
+            toml::to_string_pretty(&SyncDelegationConfigTomlFile { pool }).unwrap()
+        )
     }
 }
