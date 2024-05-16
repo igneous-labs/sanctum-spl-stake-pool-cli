@@ -55,10 +55,7 @@ impl SyncPoolArgs {
         let stake_pool: StakePool =
             StakePool::deserialize(&mut fetched_pool.data.as_slice()).unwrap();
 
-        let curr_manager = old_manager
-            .as_ref()
-            .or(manager.as_ref())
-            .map_or_else(|| None, |s| parse_signer(s).ok()); // if old-manager is not a valid signer, treat it as None and fall back to payer
+        let curr_manager = old_manager.as_ref().map(|s| parse_signer(s).unwrap()); // unwrap to make sure provided old-manager input is valid
         let curr_manager = curr_manager
             .as_ref()
             .map_or_else(|| payer.as_ref(), |c| c.as_ref());
@@ -69,9 +66,7 @@ impl SyncPoolArgs {
                 curr_manager.pubkey()
             );
         }
-        let new_manager = manager
-            .as_ref()
-            .map_or_else(|| None, |s| parse_signer(s).ok()); // if manager is not a valid signer, treat it as None and fall back to current manager
+        let new_manager = manager.as_ref().map(|s| parse_signer(s).unwrap()); // unwrap to make sure provided manager input is valid
         let new_manager = new_manager
             .as_ref()
             .map_or_else(|| curr_manager, |n| n.as_ref());

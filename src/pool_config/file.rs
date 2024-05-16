@@ -51,7 +51,8 @@ pub struct ConfigRaw {
     pub next_sol_withdrawal_fee: Option<FutureEpochFee>,
     pub last_epoch_pool_token_supply: Option<u64>,
     pub last_epoch_total_lamports: Option<u64>,
-    pub old_manager: Option<String>, // only present for sync-pool
+    pub old_manager: Option<String>, // only present for sync-pool when changing manager
+    pub old_staker: Option<String>,  // only present for set-staker
     pub reserve: Option<ReserveConfigRaw>,
     pub validators: Option<Vec<ValidatorConfigRaw>>, // put this last so it gets outputted last in toml Serialize
 }
