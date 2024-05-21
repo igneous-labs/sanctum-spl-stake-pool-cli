@@ -24,6 +24,7 @@ pub struct UpdateArgs {
         short,
         help = "How to run the update",
         default_value_t = UpdateCtrl::IfNeeded,
+        value_enum,
     )]
     pub ctrl: UpdateCtrl,
 
