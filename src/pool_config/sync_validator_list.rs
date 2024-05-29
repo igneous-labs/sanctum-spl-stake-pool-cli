@@ -23,7 +23,6 @@ use crate::pool_config::utils::pubkey_opt_display;
 
 /// All generated ixs must be signed by staker only.
 /// Adds and removes validators from the list to match `self.validators`
-/// TODO: SyncDelegationConfig for staker to control delegation every epoch
 #[derive(Debug)]
 pub struct SyncValidatorListConfig<'a> {
     pub program_id: Pubkey,
@@ -300,6 +299,10 @@ impl IntoIterator for RemoveValidatorIxs {
 }
 
 pub fn print_removing_validators_msg<'a>(remove: impl Iterator<Item = &'a ValidatorStakeInfo>) {
+    let mut remove = remove.peekable();
+    if remove.peek().is_none() {
+        return;
+    }
     eprint!("Removing validators: ");
     for to_remove in remove {
         eprint!("{}, ", to_remove.vote_account_address);
@@ -308,6 +311,10 @@ pub fn print_removing_validators_msg<'a>(remove: impl Iterator<Item = &'a Valida
 }
 
 pub fn print_adding_validators_msg<'a>(add: impl Iterator<Item = &'a Pubkey>) {
+    let mut add = add.peekable();
+    if add.peek().is_none() {
+        return;
+    }
     eprint!("Adding validators: ");
     for to_add in add {
         eprint!("{to_add}, ");
