@@ -12,9 +12,11 @@ use solana_sdk::{
 use spl_stake_pool_interface::{
     add_validator_to_pool_ix_with_program_id,
     decrease_additional_validator_stake_ix_with_program_id,
+    increase_additional_validator_stake_ix_with_program_id,
     remove_validator_from_pool_ix_with_program_id, set_preferred_validator_ix_with_program_id,
     AddValidatorToPoolIxArgs, AddValidatorToPoolKeys, AdditionalValidatorStakeArgs,
     DecreaseAdditionalValidatorStakeIxArgs, DecreaseAdditionalValidatorStakeKeys,
+    IncreaseAdditionalValidatorStakeKeys, IncreaseAdditionalValidatorStakeIxArgs,
     PreferredValidatorType, RemoveValidatorFromPoolKeys, SetPreferredValidatorIxArgs,
     SetPreferredValidatorKeys, StakePool, ValidatorStakeInfo,
 };
@@ -277,6 +279,158 @@ impl<'a> SyncValidatorListConfig<'a> {
         } else {
             RemoveValidatorIxs::RemoveDirectly(remove_ix)
         })
+    }
+
+    pub fn increase_validators_stake_ixs<'b>(
+        &self,
+        remove: impl Iterator<Item = &'b ValidatorStakeInfo>,
+        lamports_to_increase: u64,
+    ) -> std::io::Result<Vec<Instruction>> {
+        let mut res = vec![];
+        for rem_args in remove {
+            res.extend(self.increase_validator_stake_ix(rem_args, lamports_to_increase)?.into_iter())
+        }
+        Ok(res)
+    }
+
+    fn increase_validator_stake_ix(        
+        &self,
+        ValidatorStakeInfo {
+            active_stake_lamports,
+            transient_seed_suffix,
+            validator_seed_suffix,
+            vote_account_address,
+            ..
+        }: &ValidatorStakeInfo,
+        lamports_to_increase: u64,
+    ) -> std::io::Result<RemoveValidatorIxs> {
+        let validator_stake_account =
+            FindValidatorStakeAccount::new(FindValidatorStakeAccountArgs {
+                pool: self.pool,
+                vote: *vote_account_address,
+                seed: NonZeroU32::new(*validator_seed_suffix),
+            })
+            .run_for_prog(&self.program_id)
+            .0;
+        let transient_stake_account =
+            FindTransientStakeAccount::new(FindTransientStakeAccountArgs {
+                pool: self.pool,
+                vote: *vote_account_address,
+                seed: *transient_seed_suffix,
+            })
+            .run_for_prog(&self.program_id)
+            .0;
+            let ephemeral_stake_seed = 0;
+            let increase_ix = increase_additional_validator_stake_ix_with_program_id(
+                self.program_id,
+                IncreaseAdditionalValidatorStakeKeys {
+                    stake_pool: self.pool,
+                    staker: self.staker.pubkey(),
+                    withdraw_authority: self.withdraw_auth(),
+                    validator_list: self.validator_list,
+                    reserve_stake: self.reserve,
+                    ephemeral_stake_account: FindEphemeralStakeAccount::new(
+                        FindEphemeralStakeAccountArgs {
+                            pool: self.pool,
+                            seed: ephemeral_stake_seed,
+                        },
+                    )
+                    .run_for_prog(&self.program_id)
+                    .0,
+                    transient_stake_account,
+                    validator_stake_account,
+                    vote_account: *vote_account_address,
+                    clock: sysvar::clock::ID,
+                    stake_history: sysvar::stake_history::ID,
+                    stake_config: stake::config::ID,
+                    system_program: system_program::ID,
+                    stake_program: stake::program::ID,
+                },
+                IncreaseAdditionalValidatorStakeIxArgs {
+                    args: AdditionalValidatorStakeArgs {
+                        lamports: lamports_to_increase,
+                        transient_stake_seed: *transient_seed_suffix,
+                        ephemeral_stake_seed,
+                    },
+                },
+            )?;
+            Ok(RemoveValidatorIxs::RemoveDirectly(increase_ix))
+    }
+
+
+    pub fn decrease_validators_stake_ixs<'b>(
+        &self,
+        remove: impl Iterator<Item = &'b ValidatorStakeInfo>,
+        lamports_to_decrease: u64,
+    ) -> std::io::Result<Vec<Instruction>> {
+        let mut res = vec![];
+        for rem_args in remove {
+            res.extend(self.decrease_validator_stake_ixs(rem_args, lamports_to_decrease)?.into_iter())
+        }
+        Ok(res)
+    }
+
+    fn decrease_validator_stake_ixs(
+        &self,
+        ValidatorStakeInfo {
+            active_stake_lamports,
+            transient_seed_suffix,
+            validator_seed_suffix,
+            vote_account_address,
+            ..
+        }: &ValidatorStakeInfo,
+        lamports_to_decrease: u64,
+    ) -> std::io::Result<RemoveValidatorIxs> {
+        let validator_stake_account =
+            FindValidatorStakeAccount::new(FindValidatorStakeAccountArgs {
+                pool: self.pool,
+                vote: *vote_account_address,
+                seed: NonZeroU32::new(*validator_seed_suffix),
+            })
+            .run_for_prog(&self.program_id)
+            .0;
+        let transient_stake_account =
+            FindTransientStakeAccount::new(FindTransientStakeAccountArgs {
+                pool: self.pool,
+                vote: *vote_account_address,
+                seed: *transient_seed_suffix,
+            })
+            .run_for_prog(&self.program_id)
+            .0;
+
+            let ephemeral_stake_seed = 0;
+            let decrease_ix = decrease_additional_validator_stake_ix_with_program_id(
+                self.program_id,
+                DecreaseAdditionalValidatorStakeKeys {
+                    stake_pool: self.pool,
+                    staker: self.staker.pubkey(),
+                    withdraw_authority: self.withdraw_auth(),
+                    validator_list: self.validator_list,
+                    reserve_stake: self.reserve,
+                    validator_stake_account,
+                    ephemeral_stake_account: FindEphemeralStakeAccount::new(
+                        FindEphemeralStakeAccountArgs {
+                            pool: self.pool,
+                            seed: ephemeral_stake_seed,
+                        },
+                    )
+                    .run_for_prog(&self.program_id)
+                    .0,
+                    transient_stake_account,
+                    clock: sysvar::clock::ID,
+                    stake_history: sysvar::stake_history::ID,
+                    system_program: system_program::ID,
+                    stake_program: stake::program::ID,
+                },
+                DecreaseAdditionalValidatorStakeIxArgs {
+                    args: AdditionalValidatorStakeArgs {
+                        lamports: lamports_to_decrease,
+                        transient_stake_seed: *transient_seed_suffix,
+                        ephemeral_stake_seed,
+                    },
+                },
+            )?;
+            Ok(RemoveValidatorIxs::RemoveDirectly(decrease_ix))
     }
 }
 
