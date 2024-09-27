@@ -157,8 +157,8 @@ impl CreatePoolArgs {
         ]
         .map(|(f1, f2)| select_higher_fee(f1, f2));
 
-        let staker = staker.map(|s| parse_signer(&s).unwrap());
-        let staker = staker.as_ref().map_or_else(|| manager, |s| s.as_ref());
+        let staker = staker.map(|s| PubkeySrc::parse(&s).unwrap().pubkey());
+        let staker = staker.unwrap_or_else(|| manager.pubkey());
         let stake_deposit_auth = stake_deposit_auth.map_or_else(
             || None,
             |s| {
@@ -190,7 +190,10 @@ impl CreatePoolArgs {
             reserve: reserve.as_ref(),
             manager,
             manager_fee_account,
-            staker: staker.pubkey(),
+            // set staker to initial manager first,
+            // then change to specified pubkey at the end
+            // after all initial staker operations (adding validators etc) are complete
+            staker: manager.pubkey(),
             deposit_auth: stake_deposit_auth,
             deposit_referral_fee,
             epoch_fee: epoch_fee.clone(),
@@ -269,8 +272,6 @@ impl CreatePoolArgs {
         )
         .await;
 
-        // setup fees and other pool settings that's not covered by Initialize
-
         // use a dummy instead of fetching the newly created pool from rpc so that it works for --dump-msg
         //
         // the sol_*_fees are going to be set to the same value as the
@@ -316,55 +317,13 @@ impl CreatePoolArgs {
             last_epoch_pool_token_supply: 0,
             last_epoch_total_lamports: 0,
         };
-        let spc = SyncPoolConfig {
-            program_id,
-            pool: cc.pool.pubkey(),
-            payer: cc.payer,
-            manager,
-            new_manager: manager,
-            staker: staker.pubkey(),
-            manager_fee_account,
-            sol_deposit_auth,
-            stake_deposit_auth,
-            sol_withdraw_auth,
-            epoch_fee,
-            stake_deposit_referral_fee,
-            sol_deposit_referral_fee,
-            stake_withdrawal_fee,
-            sol_withdrawal_fee,
-            stake_deposit_fee,
-            sol_deposit_fee,
-        };
-
-        let changeset = spc.changeset(&dummy_created_pool);
-        for change in changeset.iter() {
-            eprintln!("{change}");
-        }
-        let sync_pool_ixs = spc.changeset_ixs(&changeset).unwrap();
-        if !sync_pool_ixs.is_empty() {
-            let sync_pool_ixs = match args.send_mode {
-                TxSendMode::DumpMsg => sync_pool_ixs,
-                _ => {
-                    with_auto_cb_ixs(&rpc, &payer.pubkey(), sync_pool_ixs, &[], args.fee_limit_cb)
-                        .await
-                }
-            };
-            handle_tx_full(
-                &rpc,
-                args.send_mode,
-                &sync_pool_ixs,
-                &[],
-                &mut spc.signers_maybe_dup(),
-            )
-            .await;
-        }
 
         // Setup validator list
 
         let svlc = SyncValidatorListConfig {
             program_id,
             payer: payer.as_ref(),
-            staker,
+            staker: manager,
             pool: pool.pubkey(),
             validator_list: validator_list.pubkey(),
             reserve: reserve.pubkey(),
@@ -410,7 +369,7 @@ impl CreatePoolArgs {
             .await;
         }
 
-        // finally, set preferred validators since
+        // set preferred validators after since
         // we can only set preferred validators after adding the validators to the list
         let preferred_validator_changes = svlc.preferred_validator_changeset(&dummy_created_pool);
         for change in preferred_validator_changes.clone() {
@@ -439,6 +398,52 @@ impl CreatePoolArgs {
                 &preferred_validator_ixs,
                 &[],
                 &mut svlc.signers_maybe_dup(),
+            )
+            .await;
+        }
+
+        // setup fees and other pool settings that's not covered by Initialize,
+        // change staker if different from manager
+
+        let spc = SyncPoolConfig {
+            program_id,
+            pool: cc.pool.pubkey(),
+            payer: cc.payer,
+            manager,
+            new_manager: manager,
+            staker,
+            manager_fee_account,
+            sol_deposit_auth,
+            stake_deposit_auth,
+            sol_withdraw_auth,
+            epoch_fee,
+            stake_deposit_referral_fee,
+            sol_deposit_referral_fee,
+            stake_withdrawal_fee,
+            sol_withdrawal_fee,
+            stake_deposit_fee,
+            sol_deposit_fee,
+        };
+
+        let changeset = spc.changeset(&dummy_created_pool);
+        for change in changeset.iter() {
+            eprintln!("{change}");
+        }
+        let sync_pool_ixs = spc.changeset_ixs(&changeset).unwrap();
+        if !sync_pool_ixs.is_empty() {
+            let sync_pool_ixs = match args.send_mode {
+                TxSendMode::DumpMsg => sync_pool_ixs,
+                _ => {
+                    with_auto_cb_ixs(&rpc, &payer.pubkey(), sync_pool_ixs, &[], args.fee_limit_cb)
+                        .await
+                }
+            };
+            handle_tx_full(
+                &rpc,
+                args.send_mode,
+                &sync_pool_ixs,
+                &[],
+                &mut spc.signers_maybe_dup(),
             )
             .await;
         }
