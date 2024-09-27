@@ -37,6 +37,7 @@ sanctum-spl-stake-pool-lib = { git = "https://github.com/igneous-labs/sanctum-so
 solana-account-decoder = "~1.17" # need to explicitly specify or cargo pulls 1.5 for some goddamn reason
 solana-client = "~1.17" # need to explicitly specify or cargo pulls 1.5 for some goddamn reason
 solana-program = "=1.17.6"
+solana-remote-wallet = { version = "~1.17", features = ["hidapi"] } # for ledger support
 solana-sdk = "~1.17"
 solana-transaction-status = "~1.17" # need to explicitly specify or cargo pulls 1.5 for some goddamn reason
 
