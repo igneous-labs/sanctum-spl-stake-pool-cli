@@ -6,8 +6,12 @@ use sanctum_spl_stake_pool_lib::{
     FindValidatorStakeAccountArgs, FindWithdrawAuthority,
 };
 use solana_sdk::{
-    instruction::Instruction, pubkey::Pubkey, rent::Rent, signer::Signer, stake, system_program,
-    sysvar,
+    instruction::Instruction,
+    pubkey::Pubkey,
+    rent::Rent,
+    signer::Signer,
+    stake::{self, state::StakeStateV2},
+    system_program, sysvar,
 };
 use spl_stake_pool_interface::{
     add_validator_to_pool_ix_with_program_id,
@@ -189,11 +193,11 @@ impl<'a> SyncValidatorListConfig<'a> {
 
     pub fn remove_validators_ixs<'b>(
         &self,
-        remove: impl Iterator<Item = &'b ValidatorStakeInfo>,
+        remove: impl Iterator<Item = (&'b ValidatorStakeInfo, StakeStateV2)>,
     ) -> std::io::Result<Vec<Instruction>> {
         let mut res = vec![];
-        for rem_args in remove {
-            res.extend(self.remove_validator_ixs(rem_args)?.into_iter())
+        for (vsi, vsa) in remove {
+            res.extend(self.remove_validator_ixs(vsi, vsa)?.into_iter())
         }
         Ok(res)
     }
@@ -208,6 +212,7 @@ impl<'a> SyncValidatorListConfig<'a> {
             vote_account_address,
             ..
         }: &ValidatorStakeInfo,
+        vsa: StakeStateV2,
     ) -> std::io::Result<RemoveValidatorIxs> {
         let validator_stake_account =
             FindValidatorStakeAccount::new(FindValidatorStakeAccountArgs {
@@ -240,7 +245,13 @@ impl<'a> SyncValidatorListConfig<'a> {
         )?;
         let lamports_to_decrease =
             active_stake_lamports.saturating_sub(lamports_for_new_vsa(self.rent));
-        Ok(if lamports_to_decrease > 0 {
+        let is_vsa_active = match vsa {
+            StakeStateV2::Stake(_meta, stake, _flags) => {
+                stake.delegation.deactivation_epoch == u64::MAX
+            }
+            _ => false,
+        };
+        Ok(if lamports_to_decrease > 0 && is_vsa_active {
             let ephemeral_stake_seed = 0;
             let decrease_ix = decrease_additional_validator_stake_ix_with_program_id(
                 self.program_id,

@@ -1,8 +1,9 @@
-use std::{path::PathBuf, str::FromStr};
+use std::{num::NonZeroU32, path::PathBuf, str::FromStr};
 
 use borsh::BorshDeserialize;
 use clap::Args;
 use sanctum_solana_cli_utils::{parse_signer, PubkeySrc, TxSendMode};
+use sanctum_spl_stake_pool_lib::{FindValidatorStakeAccount, FindValidatorStakeAccountArgs};
 use solana_readonly_account::keyed::Keyed;
 use solana_sdk::{clock::Clock, pubkey::Pubkey, rent::Rent, sysvar};
 use spl_stake_pool_interface::{StakePool, ValidatorList};
@@ -116,11 +117,31 @@ impl SyncValidatorListArgs {
         };
 
         let (add, remove) = svlc.add_remove_changeset(&old_validators);
+        // need to additionally fetch VSAs of validators to remove to make sure they weren't
+        // already DeactivateDelinquent'd
+        let remove_vsas: Vec<Pubkey> = remove
+            .clone()
+            .map(|vsi| {
+                FindValidatorStakeAccount::new(FindValidatorStakeAccountArgs {
+                    pool,
+                    vote: vsi.vote_account_address,
+                    seed: NonZeroU32::new(vsi.validator_seed_suffix),
+                })
+                .run_for_prog(&program_id)
+                .0
+            })
+            .collect();
+        let remove_vsas = rpc
+            .get_multiple_accounts(&remove_vsas)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|acc_opt| bincode::deserialize(&acc_opt.unwrap().data).unwrap());
 
         print_removing_validators_msg(remove.clone());
 
         for remove_validator_ix_chunk in svlc
-            .remove_validators_ixs(remove)
+            .remove_validators_ixs(remove.zip(remove_vsas))
             .unwrap()
             .as_slice()
             .chunks(MAX_REMOVE_VALIDATOR_IXS_ENUM_PER_TX)

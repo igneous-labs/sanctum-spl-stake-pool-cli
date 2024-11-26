@@ -81,12 +81,33 @@ mod tests {
     use std::collections::HashSet;
 
     use sanctum_solana_test_utils::assert_tx_with_cb_ixs_within_size_limits;
-    use solana_sdk::{rent::Rent, signature::Keypair};
+    use solana_sdk::{
+        rent::Rent,
+        signature::Keypair,
+        stake::{
+            stake_flags::StakeFlags,
+            state::{Delegation, Meta, Stake, StakeStateV2},
+        },
+    };
     use spl_stake_pool_interface::{StakeStatus, ValidatorStakeInfo};
 
     use crate::pool_config::SyncValidatorListConfig;
 
     use super::*;
+
+    fn mock_all_vsas_active_itr() -> impl Iterator<Item = StakeStateV2> {
+        std::iter::repeat(StakeStateV2::Stake(
+            Meta::default(),
+            Stake {
+                delegation: Delegation {
+                    deactivation_epoch: u64::MAX,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            StakeFlags::default(),
+        ))
+    }
 
     #[test]
     fn check_max_add_validators_ix_per_tx_limit() {
@@ -154,7 +175,9 @@ mod tests {
             preferred_withdraw_validator: None,
         };
         let (_add, remove) = svlc.add_remove_changeset(&validators);
-        let ixs = svlc.remove_validators_ixs(remove).unwrap();
+        let ixs = svlc
+            .remove_validators_ixs(remove.zip(mock_all_vsas_active_itr()))
+            .unwrap();
         assert_eq!(ixs.len(), MAX_REMOVE_VALIDATOR_IXS_ENUM_PER_TX * 2);
         // size = 1184
         assert_tx_with_cb_ixs_within_size_limits(&payer.pubkey(), ixs.into_iter(), &[]);
