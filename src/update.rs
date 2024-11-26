@@ -87,6 +87,7 @@ pub async fn update_pool(
             if chunk
                 .iter()
                 .all(|vsi| vsi.last_update_epoch >= current_epoch)
+                && ctrl != UpdateCtrl::ForceAll
             {
                 continue;
             }
