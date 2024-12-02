@@ -44,6 +44,8 @@ impl SyncDelegationArgs {
             .map(|s| s.try_into().unwrap())
             .collect();
         // move Remainder to the end
+        // TODO: kinda jank to rely on this sorting behaviour to ensure
+        // correct handling of Remainder
         delegation_scheme.sort_by(|a, b| {
             if matches!(a.target, ValidatorDelegationTarget::Remainder) {
                 Ordering::Greater
@@ -154,7 +156,8 @@ impl SyncDelegationArgs {
             .map(|((scheme, vsi), (vsa, tsa))| {
                 let target_stake = match scheme.target {
                     ValidatorDelegationTarget::Lamports(lamports) => lamports,
-                    // TODO: u64::MAX ensures correct behaviour but the terminal will always print a shortfall msg
+                    // TODO: u64::MAX ensures + having the remainder entry at the end of the array
+                    // ensures correct behaviour but the terminal will always print a shortfall msg
                     ValidatorDelegationTarget::Remainder => u64::MAX,
                 };
                 (vsi, vsa, tsa, target_stake)
