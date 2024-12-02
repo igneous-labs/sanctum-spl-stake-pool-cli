@@ -177,7 +177,7 @@ struct SyncDelegationConfigTomlFile {
 pub struct SyncDelegationConfigToml {
     pub pool: String,
     pub staker: Option<String>,
-    pub validators: Option<Vec<ValidatorDelegationRaw>>, // put this last so it gets outputted last in toml Serialize
+    pub validators: Vec<ValidatorDelegationRaw>, // put this last so it gets outputted last in toml Serialize
 }
 
 impl SyncDelegationConfigToml {
@@ -276,7 +276,7 @@ mod tests {
     fn deser_example_validator_delegation_config() {
         let example_path = test_fixtures_dir().join("example-sync-delegation-config.toml");
         let pool = SyncDelegationConfigToml::read_from_path(example_path).unwrap();
-        let scheme = pool.validators.as_ref().unwrap();
+        let scheme = &pool.validators;
         eprintln!("{scheme:#?}");
         is_delegation_scheme_valid(scheme.iter().map(|vdr| &vdr.target)).unwrap();
         eprintln!(

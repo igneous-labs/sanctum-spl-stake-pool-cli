@@ -3425,6 +3425,7 @@ dependencies = [
  "borsh 0.10.3",
  "clap 4.5.4",
  "data-encoding",
+ "itertools",
  "rand 0.7.3",
  "sanctum-associated-token-lib",
  "sanctum-macros",

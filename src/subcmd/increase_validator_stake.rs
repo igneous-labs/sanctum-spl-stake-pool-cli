@@ -27,7 +27,9 @@ use crate::{
 use super::Subcmd;
 
 #[derive(Args, Debug)]
-#[command(long_about = "Increase the stake delegated to one of the validators in the stake pool")]
+#[command(
+    long_about = "(Staker only) Increase the stake delegated to one of the validators in the stake pool"
+)]
 pub struct IncreaseValidatorStakeArgs {
     #[arg(help = "Path to pool config file")]
     pub pool_config: PathBuf,
@@ -80,6 +82,14 @@ impl IncreaseValidatorStakeArgs {
             epoch: curr_epoch, ..
         } = bincode::deserialize(&clock.data).unwrap();
         let stake_pool = StakePool::deserialize(&mut stake_pool_acc.data.as_slice()).unwrap();
+
+        if staker.pubkey() != stake_pool.staker {
+            panic!(
+                "Wrong staker. Expecting {}, got {}",
+                stake_pool.staker,
+                staker.pubkey()
+            );
+        }
 
         let mut fetched = rpc
             .get_multiple_accounts(&[stake_pool.validator_list, stake_pool.reserve_stake])
