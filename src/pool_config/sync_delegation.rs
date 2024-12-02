@@ -24,7 +24,7 @@ use spl_stake_pool_interface::{
 
 /// All generated ixs must be signed by staker only.
 #[derive(Debug)]
-pub struct SyncValidatorDelegationConfig<'a> {
+pub struct SyncDelegationConfig<'a> {
     pub program_id: Pubkey,
     pub payer: &'a (dyn Signer + 'static),
     pub staker: &'a (dyn Signer + 'static),
@@ -105,7 +105,7 @@ pub fn transient_status_and_activating_stake(
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct ValidatorDelegationChangeset<D> {
+pub struct DelegationChangeset<D> {
     delegations: D,
     reserve_lamports: u64,
     curr_epoch: u64,
@@ -120,7 +120,7 @@ type ValidatorChangeSrc<'a> = (
     u64,
 );
 
-impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> ValidatorDelegationChangeset<D> {
+impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> DelegationChangeset<D> {
     pub const fn new(delegations: D, reserve_lamports: u64, curr_epoch: u64, rent: Rent) -> Self {
         Self {
             delegations,
@@ -222,7 +222,7 @@ impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> ValidatorDelegationChangese
     }
 }
 
-impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>> + Clone> ValidatorDelegationChangeset<D> {
+impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>> + Clone> DelegationChangeset<D> {
     pub fn print_all_changes(&self) {
         self.clone().print_decrease_stakes();
         self.clone().print_increase_stakes();
@@ -232,7 +232,7 @@ impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>> + Clone> ValidatorDelegation
     }
 }
 
-impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> Iterator for ValidatorDelegationChangeset<D> {
+impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> Iterator for DelegationChangeset<D> {
     type Item = ValidatorDelegationChange;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -302,7 +302,7 @@ impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> Iterator for ValidatorDeleg
     }
 }
 
-impl<'a> SyncValidatorDelegationConfig<'a> {
+impl<'a> SyncDelegationConfig<'a> {
     pub fn signers_maybe_dup(&self) -> [&'a dyn Signer; 2] {
         [self.payer, self.staker]
     }
@@ -326,8 +326,8 @@ impl<'a> SyncValidatorDelegationConfig<'a> {
     >(
         &self,
         delegations: D,
-    ) -> ValidatorDelegationChangeset<D> {
-        ValidatorDelegationChangeset::new(
+    ) -> DelegationChangeset<D> {
+        DelegationChangeset::new(
             delegations,
             self.reserve_lamports,
             self.curr_epoch,
@@ -335,7 +335,7 @@ impl<'a> SyncValidatorDelegationConfig<'a> {
         )
     }
 
-    pub fn sync_validator_delegations_ixs(
+    pub fn sync_delegation_ixs(
         &self,
         itr: impl Iterator<Item = ValidatorDelegationChange>,
     ) -> impl Iterator<Item = Instruction> {

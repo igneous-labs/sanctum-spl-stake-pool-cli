@@ -18,13 +18,15 @@ use spl_stake_pool_interface::{StakePool, ValidatorList};
 
 use crate::{
     next_epoch_stake_and_transient_status, pool_config::ConfigRaw, tx_utils::handle_tx_full,
-    with_auto_cb_ixs, SyncValidatorDelegationConfig,
+    with_auto_cb_ixs, SyncDelegationConfig,
 };
 
 use super::Subcmd;
 
 #[derive(Args, Debug)]
-#[command(long_about = "Decrease the stake delegated to one of the validators in the stake pool")]
+#[command(
+    long_about = "(Staker only) Decrease the stake delegated to one of the validators in the stake pool"
+)]
 pub struct DecreaseValidatorStakeArgs {
     #[arg(help = "Path to pool config file")]
     pub pool_config: PathBuf,
@@ -78,6 +80,14 @@ impl DecreaseValidatorStakeArgs {
         } = bincode::deserialize(&clock.data).unwrap();
         let stake_pool = StakePool::deserialize(&mut stake_pool_acc.data.as_slice()).unwrap();
 
+        if staker.pubkey() != stake_pool.staker {
+            panic!(
+                "Wrong staker. Expecting {}, got {}",
+                stake_pool.staker,
+                staker.pubkey()
+            );
+        }
+
         let mut fetched = rpc
             .get_multiple_accounts(&[stake_pool.validator_list, stake_pool.reserve_stake])
             .await
@@ -116,7 +126,7 @@ impl DecreaseValidatorStakeArgs {
         let vsa = StakeStateV2::deserialize(&mut fetched.pop().unwrap().unwrap().data.as_slice())
             .unwrap();
 
-        let svdc = SyncValidatorDelegationConfig {
+        let sdc = SyncDelegationConfig {
             program_id,
             payer: payer.as_ref(),
             staker,
@@ -136,11 +146,11 @@ impl DecreaseValidatorStakeArgs {
                 next_epoch_stake.saturating_sub(amt)
             }
         };
-        let changes = svdc.changeset(std::iter::once((vsi, &vsa, &tsa, desired_stake)));
+        let changes = sdc.changeset(std::iter::once((vsi, &vsa, &tsa, desired_stake)));
         changes.print_all_changes();
 
         // should only have 1 ix
-        let ixs: Vec<Instruction> = svdc.sync_validator_delegations_ixs(changes).collect();
+        let ixs: Vec<Instruction> = sdc.sync_delegation_ixs(changes).collect();
         if !ixs.is_empty() {
             let ixs = match args.send_mode {
                 TxSendMode::DumpMsg => ixs,
@@ -151,7 +161,7 @@ impl DecreaseValidatorStakeArgs {
                 args.send_mode,
                 &ixs,
                 &[],
-                &mut svdc.signers_maybe_dup(),
+                &mut sdc.signers_maybe_dup(),
             )
             .await;
         }

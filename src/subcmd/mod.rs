@@ -6,6 +6,7 @@ mod deposit_stake;
 mod increase_validator_stake;
 mod list;
 mod set_staker;
+mod sync_delegation;
 mod sync_pool;
 mod sync_validator_list;
 mod update;
@@ -17,6 +18,7 @@ pub use deposit_stake::*;
 pub use increase_validator_stake::*;
 pub use list::*;
 pub use set_staker::*;
+pub use sync_delegation::*;
 pub use sync_pool::*;
 pub use sync_validator_list::*;
 pub use update::*;
@@ -30,6 +32,7 @@ pub enum Subcmd {
     IncreaseValidatorStake(IncreaseValidatorStakeArgs),
     List(ListArgs),
     SetStaker(SetStakerArgs),
+    SyncDelegation(SyncDelegationArgs),
     SyncPool(SyncPoolArgs),
     SyncValidatorList(SyncValidatorListArgs),
     Update(UpdateArgs),
@@ -45,6 +48,7 @@ impl Subcmd {
             Self::IncreaseValidatorStake(_) => IncreaseValidatorStakeArgs::run(args).await,
             Self::List(_) => ListArgs::run(args).await,
             Self::SetStaker(_) => SetStakerArgs::run(args).await,
+            Self::SyncDelegation(_) => SyncDelegationArgs::run(args).await,
             Self::SyncPool(_) => SyncPoolArgs::run(args).await,
             Self::SyncValidatorList(_) => SyncValidatorListArgs::run(args).await,
             Self::Update(_) => UpdateArgs::run(args).await,
