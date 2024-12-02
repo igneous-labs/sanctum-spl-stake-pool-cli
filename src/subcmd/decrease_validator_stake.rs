@@ -141,17 +141,19 @@ impl DecreaseValidatorStakeArgs {
 
         // should only have 1 ix
         let ixs: Vec<Instruction> = svdc.sync_validator_delegations_ixs(changes).collect();
-        let ixs = match args.send_mode {
-            TxSendMode::DumpMsg => ixs,
-            _ => with_auto_cb_ixs(&rpc, &payer.pubkey(), ixs, &[], args.fee_limit_cb).await,
-        };
-        handle_tx_full(
-            &rpc,
-            args.send_mode,
-            &ixs,
-            &[],
-            &mut svdc.signers_maybe_dup(),
-        )
-        .await;
+        if !ixs.is_empty() {
+            let ixs = match args.send_mode {
+                TxSendMode::DumpMsg => ixs,
+                _ => with_auto_cb_ixs(&rpc, &payer.pubkey(), ixs, &[], args.fee_limit_cb).await,
+            };
+            handle_tx_full(
+                &rpc,
+                args.send_mode,
+                &ixs,
+                &[],
+                &mut svdc.signers_maybe_dup(),
+            )
+            .await;
+        }
     }
 }
