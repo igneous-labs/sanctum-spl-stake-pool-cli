@@ -1,5 +1,6 @@
-use std::{fs::read_to_string, num::NonZeroU32, path::Path};
+use std::{error::Error, fs::read_to_string, num::NonZeroU32, path::Path};
 
+use sanctum_solana_cli_utils::PubkeySrc;
 use sanctum_spl_stake_pool_lib::{
     FindTransientStakeAccount, FindTransientStakeAccountArgs, FindValidatorStakeAccount,
     FindValidatorStakeAccountArgs,
@@ -165,6 +166,79 @@ impl<'a> std::fmt::Display for ConfigTomlFile<'a> {
     }
 }
 
+/// Used to deserialize input config toml files
+#[derive(Debug, Deserialize, Serialize)]
+struct SyncDelegationConfigTomlFile {
+    pub pool: SyncDelegationConfigToml,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct SyncDelegationConfigToml {
+    pub pool: String,
+    pub staker: Option<String>,
+    pub validators: Option<Vec<ValidatorDelegationRaw>>, // put this last so it gets outputted last in toml Serialize
+}
+
+impl SyncDelegationConfigToml {
+    pub fn read_from_path<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
+        // toml crate only handles strings, not io::Read lol
+        let s = read_to_string(path)?;
+        let SyncDelegationConfigTomlFile { pool } =
+            toml::from_str(&s).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        Ok(pool)
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ValidatorDelegationRaw {
+    pub vote: String,
+    pub target: ValidatorDelegationTarget,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct ValidatorDelegation {
+    pub vote: Pubkey,
+    pub target: ValidatorDelegationTarget,
+}
+
+impl TryFrom<ValidatorDelegationRaw> for ValidatorDelegation {
+    type Error = Box<dyn Error>;
+
+    fn try_from(
+        ValidatorDelegationRaw { vote, target }: ValidatorDelegationRaw,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            target,
+            vote: PubkeySrc::parse(&vote)?.pubkey(),
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ValidatorDelegationTarget {
+    Lamports(u64),
+    Remainder,
+}
+
+pub fn is_delegation_scheme_valid<'a>(
+    targets: impl Iterator<Item = &'a ValidatorDelegationTarget>,
+) -> Result<(), &'static str> {
+    let mut has_remainder = false;
+    for target in targets {
+        if matches!(target, ValidatorDelegationTarget::Remainder) {
+            if has_remainder {
+                return Err("Can only have at most one validator with target=remainder");
+            } else {
+                has_remainder = true;
+            }
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use sanctum_solana_test_utils::test_fixtures_dir;
@@ -196,5 +270,18 @@ mod tests {
         );
 
         eprintln!("{}", ConfigTomlFile { pool: &res });
+    }
+
+    #[test]
+    fn deser_example_validator_delegation_config() {
+        let example_path = test_fixtures_dir().join("example-sync-delegation-config.toml");
+        let pool = SyncDelegationConfigToml::read_from_path(example_path).unwrap();
+        let scheme = pool.validators.as_ref().unwrap();
+        eprintln!("{scheme:#?}");
+        is_delegation_scheme_valid(scheme.iter().map(|vdr| &vdr.target)).unwrap();
+        eprintln!(
+            "{}",
+            toml::to_string_pretty(&SyncDelegationConfigTomlFile { pool }).unwrap()
+        )
     }
 }
