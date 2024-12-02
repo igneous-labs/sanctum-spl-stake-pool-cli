@@ -27,7 +27,6 @@ use crate::pool_config::utils::pubkey_opt_display;
 
 /// All generated ixs must be signed by staker only.
 /// Adds and removes validators from the list to match `self.validators`
-/// TODO: SyncDelegationConfig for staker to control delegation every epoch
 #[derive(Debug)]
 pub struct SyncValidatorListConfig<'a> {
     pub program_id: Pubkey,
