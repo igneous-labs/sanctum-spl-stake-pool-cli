@@ -11,8 +11,8 @@ use solana_sdk::{clock::Clock, pubkey::Pubkey, rent::Rent, stake::state::StakeSt
 use spl_stake_pool_interface::{StakePool, ValidatorList, ValidatorStakeInfo};
 
 use crate::{
-    handle_tx_full, is_delegation_scheme_valid, with_auto_cb_ixs, SyncDelegationConfigToml,
-    SyncValidatorDelegationConfig, ValidatorDelegation, ValidatorDelegationTarget,
+    handle_tx_full, is_delegation_scheme_valid, with_auto_cb_ixs, SyncDelegationConfig,
+    SyncDelegationConfigToml, ValidatorDelegation, ValidatorDelegationTarget,
     MAX_INCREASE_VALIDATOR_STAKE_IX_PER_TX,
 };
 
@@ -160,7 +160,7 @@ impl SyncDelegationArgs {
                 (vsi, vsa, tsa, target_stake)
             });
 
-        let svdc = SyncValidatorDelegationConfig {
+        let sdc = SyncDelegationConfig {
             program_id,
             payer: payer.as_ref(),
             staker,
@@ -172,12 +172,12 @@ impl SyncDelegationArgs {
             rent,
         };
 
-        let changes = svdc.changeset(change_srcs);
+        let changes = sdc.changeset(change_srcs);
         changes.print_all_changes();
 
         // IncreaseAdditionalValidatorStake is worst case, takes 14 account inputs vs Decrease's 11
-        for ix_chunk in &svdc
-            .sync_validator_delegations_ixs(changes)
+        for ix_chunk in &sdc
+            .sync_delegation_ixs(changes)
             .chunks(MAX_INCREASE_VALIDATOR_STAKE_IX_PER_TX)
         {
             let ix_chunk = match args.send_mode {
@@ -198,7 +198,7 @@ impl SyncDelegationArgs {
                 args.send_mode,
                 &ix_chunk,
                 &[],
-                &mut svdc.signers_maybe_dup(),
+                &mut sdc.signers_maybe_dup(),
             )
             .await;
         }

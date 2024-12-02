@@ -93,7 +93,7 @@ mod tests {
     };
     use spl_stake_pool_interface::{StakeStatus, ValidatorStakeInfo};
 
-    use crate::{pool_config::SyncValidatorListConfig, SyncValidatorDelegationConfig};
+    use crate::{pool_config::SyncValidatorListConfig, SyncDelegationConfig};
 
     use super::*;
 
@@ -203,7 +203,7 @@ mod tests {
             .collect();
         let payer = Keypair::new();
         let staker = Keypair::new();
-        let svdc = SyncValidatorDelegationConfig {
+        let sdc = SyncDelegationConfig {
             program_id: Pubkey::new_unique(),
             payer: &payer,
             staker: &staker,
@@ -216,13 +216,13 @@ mod tests {
         };
         let mock_vsa_state =
             StakeStateV2::Stake(Default::default(), Default::default(), Default::default());
-        let cs = svdc.changeset(
+        let cs = sdc.changeset(
             validators
                 .iter()
                 .zip(std::iter::repeat((&mock_vsa_state, &None, 1_000_000_000)))
                 .map(|(vsi, (vsa, tsa, target))| (vsi, vsa, tsa, target)),
         );
-        let ixs: Vec<_> = svdc.sync_validator_delegations_ixs(cs).collect();
+        let ixs: Vec<_> = sdc.sync_delegation_ixs(cs).collect();
         assert_eq!(ixs.len(), MAX_INCREASE_VALIDATOR_STAKE_IX_PER_TX);
         /*
         eprintln!(

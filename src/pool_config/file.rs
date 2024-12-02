@@ -273,7 +273,7 @@ mod tests {
     }
 
     #[test]
-    fn deser_example_validator_delegation_config() {
+    fn deser_example_sync_delegation_config() {
         let example_path = test_fixtures_dir().join("example-sync-delegation-config.toml");
         let pool = SyncDelegationConfigToml::read_from_path(example_path).unwrap();
         let scheme = &pool.validators;
