@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 
+use sanctum_solana_cli_utils::TokenAmt;
 use sanctum_spl_stake_pool_lib::{
     lamports_for_new_vsa, FindEphemeralStakeAccount, FindEphemeralStakeAccountArgs,
     FindTransientStakeAccount, FindTransientStakeAccountArgs, FindValidatorStakeAccount,
@@ -133,9 +134,13 @@ impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> ValidatorDelegationChangese
         self.print_summary(
             "Decreasing stake:",
             |ValidatorDelegationChange { ty, vote, .. }| match ty {
-                ValidatorDelegationChangeTy::DecreaseStake(dec) => {
-                    Some(format!("{dec} lamports from {vote}"))
-                }
+                ValidatorDelegationChangeTy::DecreaseStake(dec) => Some(format!(
+                    "{} SOL from {vote}",
+                    TokenAmt {
+                        amt: dec,
+                        decimals: 9
+                    }
+                )),
                 _ => None,
             },
         );
@@ -145,9 +150,13 @@ impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> ValidatorDelegationChangese
         self.print_summary(
             "Increasing stake:",
             |ValidatorDelegationChange { ty, vote, .. }| match ty {
-                ValidatorDelegationChangeTy::IncreaseStake(inc) => {
-                    Some(format!("{inc} lamports to {vote}"))
-                }
+                ValidatorDelegationChangeTy::IncreaseStake(inc) => Some(format!(
+                    "{} SOL to {vote}",
+                    TokenAmt {
+                        amt: inc,
+                        decimals: 9
+                    }
+                )),
                 _ => None,
             },
         );
@@ -155,13 +164,21 @@ impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> ValidatorDelegationChangese
 
     pub fn print_partial_increase_stakes(self) {
         self.print_summary(
-            "Partially increasing stake: ",
+            "Partially increasing stake:",
             |ValidatorDelegationChange { ty, vote, .. }| match ty {
                 ValidatorDelegationChangeTy::PartialIncreaseStake {
                     increase,
                     shortfall,
                 } => Some(format!(
-                    "{increase} lamports to {vote} ({shortfall} lamports shortfall)"
+                    "{} SOL to {vote} ({} SOL shortfall)",
+                    TokenAmt {
+                        amt: increase,
+                        decimals: 9
+                    },
+                    TokenAmt {
+                        amt: shortfall,
+                        decimals: 9
+                    }
                 )),
                 _ => None,
             },
@@ -170,7 +187,7 @@ impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> ValidatorDelegationChangese
 
     pub fn print_insufficient_reserve_lamports(self) {
         self.print_summary(
-            "Insufficient reserve lamports to increase stake to: ",
+            "Insufficient reserve lamports to increase stake to:",
             |ValidatorDelegationChange { ty, vote, .. }| match ty {
                 ValidatorDelegationChangeTy::InsufficientReserveLamports => Some(format!("{vote}")),
                 _ => None,
@@ -180,7 +197,7 @@ impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> ValidatorDelegationChangese
 
     pub fn print_transient_wrong_states(self) {
         self.print_summary(
-            "Transient stake account in wrong state to make changes for: ",
+            "Transient stake account in wrong state to make changes for:",
             |ValidatorDelegationChange { ty, vote, .. }| match ty {
                 ValidatorDelegationChangeTy::TransientWrongState => Some(format!("{vote}")),
                 _ => None,
