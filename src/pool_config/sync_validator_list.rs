@@ -20,7 +20,7 @@ use spl_stake_pool_interface::{
     AddValidatorToPoolIxArgs, AddValidatorToPoolKeys, AdditionalValidatorStakeArgs,
     DecreaseAdditionalValidatorStakeIxArgs, DecreaseAdditionalValidatorStakeKeys,
     PreferredValidatorType, RemoveValidatorFromPoolKeys, SetPreferredValidatorIxArgs,
-    SetPreferredValidatorKeys, StakePool, ValidatorStakeInfo,
+    SetPreferredValidatorKeys, StakePool, StakeStatus, ValidatorStakeInfo,
 };
 
 use crate::pool_config::utils::pubkey_opt_display;
@@ -147,9 +147,11 @@ impl<'a> SyncValidatorListConfig<'a> {
                     .iter()
                     .any(|vsi| vsi.vote_account_address == **v)
             }),
-            validator_list
-                .iter()
-                .filter(|vsi| !self.validators.contains(&vsi.vote_account_address)),
+            validator_list.iter().filter(|vsi| {
+                // if status != StakeStatus::Active, validator has already been removed from pool
+                vsi.status == StakeStatus::Active
+                    && !self.validators.contains(&vsi.vote_account_address)
+            }),
         )
     }
 
