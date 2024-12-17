@@ -247,9 +247,6 @@ impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> Iterator for DelegationChan
                     let decrease_stake_amt =
                         (next_epoch_stake - desired).saturating_sub(MIN_ACTIVE_STAKE);
                     let sa_rent_lamports = lamports_for_new_vsa(&self.rent);
-                    // TODO: maybe introduce new ValidatorDelegationChangeTy variant to
-                    // report instances where decrease is < min_tsa_balance.
-                    // But in most cases, this is due to the minimum active stake in the vsa accruing staking yields
                     let min_tsa_balance = MIN_ACTIVE_STAKE + sa_rent_lamports;
                     ValidatorDelegationChange {
                         vote: vsi.vote_account_address,
@@ -259,8 +256,16 @@ impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> Iterator for DelegationChan
                             // reserve needs to fund the ephemeral and transient stake accounts
                             ValidatorDelegationChangeTy::InsufficientReserveLamports
                         } else if decrease_stake_amt < min_tsa_balance {
+                            // TODO: maybe introduce new ValidatorDelegationChangeTy variant to
+                            // report instances where decrease is < min_tsa_balance.
+                            // But in most cases, this is due to the minimum active stake in the vsa accruing staking yields,
+                            // ie NoChange
                             ValidatorDelegationChangeTy::NoChange
                         } else {
+                            if let TransientStakeAccStatus::None = tsa_status {
+                                // rent for tsa
+                                self.reserve_lamports -= sa_rent_lamports;
+                            }
                             ValidatorDelegationChangeTy::DecreaseStake(decrease_stake_amt)
                         },
                     }
@@ -284,18 +289,24 @@ impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> Iterator for DelegationChan
                         self.reserve_lamports.saturating_sub(2 * sa_rent_lamports);
                     let desired_inc = desired - next_epoch_stake;
                     let actual_inc = std::cmp::min(available_stake, desired_inc);
-                    self.reserve_lamports -= actual_inc;
                     ValidatorDelegationChange {
                         vote: vsi.vote_account_address,
                         transient_seed_suffix: vsi.transient_seed_suffix,
-                        ty: if actual_inc == desired_inc {
-                            ValidatorDelegationChangeTy::IncreaseStake(actual_inc)
-                        } else if actual_inc == 0 {
+                        ty: if actual_inc == 0 {
                             ValidatorDelegationChangeTy::InsufficientReserveLamports
                         } else {
-                            ValidatorDelegationChangeTy::PartialIncreaseStake {
-                                increase: actual_inc,
-                                shortfall: desired_inc - actual_inc,
+                            self.reserve_lamports -= actual_inc;
+                            if let TransientStakeAccStatus::None = tsa_status {
+                                // rent for tsa
+                                self.reserve_lamports -= sa_rent_lamports;
+                            }
+                            if actual_inc == desired_inc {
+                                ValidatorDelegationChangeTy::IncreaseStake(actual_inc)
+                            } else {
+                                ValidatorDelegationChangeTy::PartialIncreaseStake {
+                                    increase: actual_inc,
+                                    shortfall: desired_inc - actual_inc,
+                                }
                             }
                         },
                     }
