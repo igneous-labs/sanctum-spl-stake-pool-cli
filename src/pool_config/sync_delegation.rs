@@ -4,7 +4,7 @@ use sanctum_solana_cli_utils::TokenAmt;
 use sanctum_spl_stake_pool_lib::{
     lamports_for_new_vsa, FindEphemeralStakeAccount, FindEphemeralStakeAccountArgs,
     FindTransientStakeAccount, FindTransientStakeAccountArgs, FindValidatorStakeAccount,
-    FindWithdrawAuthority,
+    FindWithdrawAuthority, MIN_ACTIVE_STAKE,
 };
 use solana_sdk::{
     instruction::Instruction,
@@ -180,7 +180,7 @@ impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> DelegationChangeset<D> {
 
     pub fn print_insufficient_reserve_lamports(self) {
         self.print_summary(
-            "Insufficient reserve lamports to increase stake to:",
+            "Insufficient reserve lamports to increase/decrease stake for:",
             |ValidatorDelegationChange { ty, vote, .. }| match ty {
                 ValidatorDelegationChangeTy::InsufficientReserveLamports => Some(format!("{vote}")),
                 _ => None,
@@ -242,10 +242,27 @@ impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> Iterator for DelegationChan
         match next_epoch_stake.cmp(&desired) {
             Ordering::Greater => Some(match tsa_status {
                 TransientStakeAccStatus::Deactivating | TransientStakeAccStatus::None => {
+                    // spl stake pool program requirement:
+                    // Need to leave at least MIN_ACTIVE_STAKE in VSA else instruction fails with InsufficientFunds
+                    let decrease_stake_amt =
+                        (next_epoch_stake - desired).saturating_sub(MIN_ACTIVE_STAKE);
+                    let sa_rent_lamports = lamports_for_new_vsa(&self.rent);
+                    // TODO: maybe introduce new ValidatorDelegationChangeTy variant to
+                    // report instances where decrease is < min_tsa_balance.
+                    // But in most cases, this is due to the minimum active stake in the vsa accruing staking yields
+                    let min_tsa_balance = MIN_ACTIVE_STAKE + sa_rent_lamports;
                     ValidatorDelegationChange {
                         vote: vsi.vote_account_address,
                         transient_seed_suffix: vsi.transient_seed_suffix,
-                        ty: ValidatorDelegationChangeTy::DecreaseStake(next_epoch_stake - desired),
+                        ty: if self.reserve_lamports < 2 * sa_rent_lamports {
+                            // thanks to require split stake to be rent-exempt,
+                            // reserve needs to fund the ephemeral and transient stake accounts
+                            ValidatorDelegationChangeTy::InsufficientReserveLamports
+                        } else if decrease_stake_amt < min_tsa_balance {
+                            ValidatorDelegationChangeTy::NoChange
+                        } else {
+                            ValidatorDelegationChangeTy::DecreaseStake(decrease_stake_amt)
+                        },
                     }
                 }
                 TransientStakeAccStatus::Activating => ValidatorDelegationChange {
