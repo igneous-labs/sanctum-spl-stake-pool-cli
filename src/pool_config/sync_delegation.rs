@@ -50,7 +50,14 @@ pub struct ValidatorDelegationChange {
 pub enum ValidatorDelegationChangeTy {
     DecreaseStake(u64),
     IncreaseStake(u64),
-    PartialIncreaseStake { increase: u64, shortfall: u64 },
+
+    /// Pool tries to increase to the best of abilities, but reserve
+    /// doesnt have enough lamports to increase to desired amount
+    PartialIncreaseStake {
+        increase: u64,
+        shortfall: u64,
+    },
+
     InsufficientReserveLamports,
     NoChange,
     TransientWrongState,
@@ -61,6 +68,7 @@ pub enum ValidatorDelegationChangeTy {
 pub enum TransientStakeAccStatus {
     Deactivating,
     Activating,
+    None,
 }
 
 pub fn next_epoch_stake_and_transient_status(
@@ -70,7 +78,7 @@ pub fn next_epoch_stake_and_transient_status(
 ) -> (u64, TransientStakeAccStatus) {
     let vsa_stake = vsa.delegation().unwrap().stake;
     match tsa {
-        None => (vsa_stake, TransientStakeAccStatus::Activating),
+        None => (vsa_stake, TransientStakeAccStatus::None),
         Some(ss) => {
             let dlgt = ss.delegation().unwrap();
             let transient_stake = dlgt.stake;
@@ -87,21 +95,6 @@ pub fn next_epoch_stake_and_transient_status(
             }
         }
     }
-}
-
-pub fn transient_status_and_activating_stake(
-    tsa: &StakeStateV2,
-    curr_epoch: u64,
-) -> (TransientStakeAccStatus, u64) {
-    let dlgt = tsa.delegation().unwrap();
-    (
-        if dlgt.activation_epoch == curr_epoch {
-            TransientStakeAccStatus::Activating
-        } else {
-            TransientStakeAccStatus::Deactivating
-        },
-        dlgt.stake,
-    )
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -247,34 +240,27 @@ impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> Iterator for DelegationChan
         let (next_epoch_stake, tsa_status) =
             next_epoch_stake_and_transient_status(vsa, tsa, self.curr_epoch);
         match next_epoch_stake.cmp(&desired) {
-            Ordering::Greater => {
-                if matches!(tsa_status, TransientStakeAccStatus::Activating) {
-                    Some(ValidatorDelegationChange {
-                        vote: vsi.vote_account_address,
-                        transient_seed_suffix: vsi.transient_seed_suffix,
-                        ty: ValidatorDelegationChangeTy::TransientWrongState,
-                    })
-                } else {
-                    Some(ValidatorDelegationChange {
+            Ordering::Greater => Some(match tsa_status {
+                TransientStakeAccStatus::Deactivating | TransientStakeAccStatus::None => {
+                    ValidatorDelegationChange {
                         vote: vsi.vote_account_address,
                         transient_seed_suffix: vsi.transient_seed_suffix,
                         ty: ValidatorDelegationChangeTy::DecreaseStake(next_epoch_stake - desired),
-                    })
+                    }
                 }
-            }
+                TransientStakeAccStatus::Activating => ValidatorDelegationChange {
+                    vote: vsi.vote_account_address,
+                    transient_seed_suffix: vsi.transient_seed_suffix,
+                    ty: ValidatorDelegationChangeTy::TransientWrongState,
+                },
+            }),
             Ordering::Equal => Some(ValidatorDelegationChange {
                 vote: vsi.vote_account_address,
                 transient_seed_suffix: vsi.transient_seed_suffix,
                 ty: ValidatorDelegationChangeTy::NoChange,
             }),
-            Ordering::Less => {
-                if matches!(tsa_status, TransientStakeAccStatus::Deactivating) {
-                    Some(ValidatorDelegationChange {
-                        vote: vsi.vote_account_address,
-                        transient_seed_suffix: vsi.transient_seed_suffix,
-                        ty: ValidatorDelegationChangeTy::TransientWrongState,
-                    })
-                } else {
+            Ordering::Less => Some(match tsa_status {
+                TransientStakeAccStatus::Activating | TransientStakeAccStatus::None => {
                     let sa_rent_lamports = lamports_for_new_vsa(&self.rent);
                     // https://github.com/solana-labs/solana-program-library/blob/d4b7fc06233b11efecc082cd2f6ee3eadd5daa04/stake-pool/program/src/processor.rs#L1635-L1643
                     let available_stake =
@@ -282,7 +268,7 @@ impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> Iterator for DelegationChan
                     let desired_inc = desired - next_epoch_stake;
                     let actual_inc = std::cmp::min(available_stake, desired_inc);
                     self.reserve_lamports -= actual_inc;
-                    Some(ValidatorDelegationChange {
+                    ValidatorDelegationChange {
                         vote: vsi.vote_account_address,
                         transient_seed_suffix: vsi.transient_seed_suffix,
                         ty: if actual_inc == desired_inc {
@@ -295,9 +281,14 @@ impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> Iterator for DelegationChan
                                 shortfall: desired_inc - actual_inc,
                             }
                         },
-                    })
+                    }
                 }
-            }
+                TransientStakeAccStatus::Deactivating => ValidatorDelegationChange {
+                    vote: vsi.vote_account_address,
+                    transient_seed_suffix: vsi.transient_seed_suffix,
+                    ty: ValidatorDelegationChangeTy::TransientWrongState,
+                },
+            }),
         }
     }
 }
