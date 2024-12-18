@@ -2,13 +2,14 @@ use std::{num::NonZeroU32, path::PathBuf, str::FromStr};
 
 use borsh::BorshDeserialize;
 use clap::Args;
-use sanctum_solana_cli_utils::{parse_signer, PubkeySrc, TxSendMode};
+use sanctum_solana_cli_utils::{PubkeySrc, TxSendMode};
 use sanctum_spl_stake_pool_lib::{FindValidatorStakeAccount, FindValidatorStakeAccountArgs};
 use solana_readonly_account::keyed::Keyed;
 use solana_sdk::{clock::Clock, pubkey::Pubkey, rent::Rent, sysvar};
 use spl_stake_pool_interface::{StakePool, ValidatorList};
 
 use crate::{
+    parse_signer_pubkey_none,
     pool_config::{
         print_adding_validators_msg, print_removing_validators_msg, ConfigRaw,
         SyncValidatorListConfig,
@@ -53,7 +54,7 @@ impl SyncValidatorListArgs {
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();
 
-        let staker = staker.map_or_else(|| None, |s| parse_signer(&s).ok()); // if staker is not a valid signer, treat it as None and fall back to payer
+        let staker = staker.map_or_else(|| None, |s| parse_signer_pubkey_none(&s).unwrap());
         let staker = staker
             .as_ref()
             .map_or_else(|| payer.as_ref(), |s| s.as_ref());

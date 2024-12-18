@@ -3,7 +3,7 @@ use std::{cmp::Ordering, error::Error, path::PathBuf, str::FromStr};
 use borsh::BorshDeserialize;
 use clap::Args;
 use sanctum_associated_token_lib::FindAtaAddressArgs;
-use sanctum_solana_cli_utils::{parse_signer, PubkeySrc, TxSendMode};
+use sanctum_solana_cli_utils::{PubkeySrc, TxSendMode};
 use sanctum_spl_stake_pool_lib::{CmpFee, FindDepositAuthority, FindWithdrawAuthority, ZERO_FEE};
 use solana_readonly_account::{keyed::Keyed, ReadonlyAccountOwner};
 use solana_sdk::{
@@ -20,6 +20,7 @@ use spl_token_2022::{extension::StateWithExtensions, state::Mint};
 
 use crate::{
     parse::filter_default_stake_deposit_auth,
+    parse_signer_pubkey_none,
     pool_config::{
         print_adding_validators_msg, ConfigRaw, CreateConfig, SyncPoolConfig,
         SyncValidatorListConfig,
@@ -80,8 +81,16 @@ impl CreatePoolArgs {
             validator_list.as_ref(),
             reserve.as_ref().map(|r| &r.address),
         ]
-        .map(|p| parse_signer(p.unwrap()).unwrap());
-        let manager = manager.map(|m| parse_signer(&m).unwrap());
+        .map(|p| {
+            parse_signer_pubkey_none(p.unwrap())
+                .unwrap()
+                .expect("pool, validator_list and reserve must be signers, not pubkeys")
+        });
+        let manager = manager.map(|m| {
+            parse_signer_pubkey_none(&m)
+                .unwrap()
+                .expect("Manager must be signer, not pubkey")
+        });
         let manager = manager
             .as_ref()
             .map(|m| m.as_ref())
