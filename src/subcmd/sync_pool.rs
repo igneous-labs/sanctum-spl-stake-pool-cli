@@ -6,6 +6,7 @@ use sanctum_solana_cli_utils::{parse_signer, PubkeySrc, TxSendMode};
 use spl_stake_pool_interface::StakePool;
 
 use crate::{
+    parse_signer_pubkey_none,
     pool_config::{ConfigRaw, SyncPoolConfig},
     tx_utils::{handle_tx_full, with_auto_cb_ixs},
 };
@@ -55,7 +56,9 @@ impl SyncPoolArgs {
         let stake_pool: StakePool =
             StakePool::deserialize(&mut fetched_pool.data.as_slice()).unwrap();
 
-        let curr_manager = old_manager.as_ref().map(|s| parse_signer(s).unwrap()); // unwrap to make sure provided old-manager input is valid
+        let curr_manager = old_manager
+            .as_ref()
+            .map_or_else(|| None, |s| parse_signer_pubkey_none(s).unwrap());
         let curr_manager = curr_manager
             .as_ref()
             .map_or_else(|| payer.as_ref(), |c| c.as_ref());
@@ -66,10 +69,18 @@ impl SyncPoolArgs {
                 curr_manager.pubkey()
             );
         }
-        let new_manager = manager.as_ref().map(|s| parse_signer(s).unwrap()); // unwrap to make sure provided manager input is valid
-        let new_manager = new_manager
-            .as_ref()
-            .map_or_else(|| curr_manager, |n| n.as_ref());
+        // allow pubkey signers to work with multisig programs
+        let new_manager = manager.as_ref().map(|s| parse_signer(s).unwrap());
+        let new_manager = new_manager.as_ref().map_or_else(
+            || curr_manager,
+            |nm| {
+                if nm.pubkey() == curr_manager.pubkey() {
+                    curr_manager
+                } else {
+                    nm.as_ref()
+                }
+            },
+        );
 
         let [manager_fee_account, staker] = [
             (manager_fee_account, stake_pool.manager_fee_account),

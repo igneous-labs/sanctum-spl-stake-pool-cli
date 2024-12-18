@@ -5,9 +5,7 @@ use clap::{
     builder::{StringValueParser, TypedValueParser},
     Args,
 };
-use sanctum_solana_cli_utils::{
-    parse_signer, PubkeySrc, TokenAmtOrAll, TokenAmtOrAllParser, TxSendMode,
-};
+use sanctum_solana_cli_utils::{PubkeySrc, TokenAmtOrAll, TokenAmtOrAllParser, TxSendMode};
 use sanctum_spl_stake_pool_lib::{
     FindTransientStakeAccount, FindTransientStakeAccountArgs, FindValidatorStakeAccount,
 };
@@ -17,8 +15,8 @@ use solana_sdk::{
 use spl_stake_pool_interface::{StakePool, ValidatorList};
 
 use crate::{
-    next_epoch_stake_and_transient_status, pool_config::ConfigRaw, tx_utils::handle_tx_full,
-    with_auto_cb_ixs, SyncDelegationConfig,
+    next_epoch_stake_and_transient_status, parse_signer_pubkey_none, pool_config::ConfigRaw,
+    tx_utils::handle_tx_full, with_auto_cb_ixs, SyncDelegationConfig,
 };
 
 use super::Subcmd;
@@ -58,7 +56,7 @@ impl DecreaseValidatorStakeArgs {
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();
 
-        let staker = staker.map_or_else(|| None, |s| parse_signer(&s).ok()); // if staker is not a valid signer, treat it as None and fall back to payer
+        let staker = staker.map_or_else(|| None, |s| parse_signer_pubkey_none(&s).unwrap());
         let staker = staker
             .as_ref()
             .map_or_else(|| payer.as_ref(), |s| s.as_ref());

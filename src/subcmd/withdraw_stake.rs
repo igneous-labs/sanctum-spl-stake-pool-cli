@@ -5,7 +5,7 @@ use clap::{
 use rand::Rng;
 use sanctum_associated_token_lib::FindAtaAddressArgs;
 use sanctum_solana_cli_utils::{
-    parse_signer, PubkeySrc, TokenAmt, TokenAmtOrAll, TokenAmtOrAllParser, TxSendMode,
+    PubkeySrc, TokenAmt, TokenAmtOrAll, TokenAmtOrAllParser, TxSendMode,
 };
 use sanctum_spl_stake_pool_lib::account_resolvers::WithdrawStakeWithSlippage;
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -23,7 +23,10 @@ use spl_stake_pool_interface::{
     WithdrawStakeWithSlippageIxArgs,
 };
 
-use crate::{handle_tx_full, update_pool, with_auto_cb_ixs, Subcmd, UpdateCtrl, UpdatePoolArgs};
+use crate::{
+    handle_tx_full, parse_signer_pubkey_none, update_pool, with_auto_cb_ixs, Subcmd, UpdateCtrl,
+    UpdatePoolArgs,
+};
 
 #[derive(Args, Debug)]
 #[command(long_about = "Withdraws stake from a stake pool")]
@@ -85,7 +88,11 @@ impl WithdrawStakeArgs {
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();
 
-        let authority = authority.map(|a| parse_signer(&a).unwrap());
+        let authority = authority.map(|a| {
+            parse_signer_pubkey_none(&a)
+                .unwrap()
+                .expect("authority must be a signer, not pubkey")
+        });
         let authority = authority
             .as_ref()
             .map_or_else(|| payer.as_ref(), |authority| authority.as_ref());

@@ -2,10 +2,10 @@ use std::path::PathBuf;
 
 use borsh::BorshDeserialize;
 use clap::Args;
-use sanctum_solana_cli_utils::{parse_signer, PubkeySrc, TxSendMode};
+use sanctum_solana_cli_utils::{PubkeySrc, TxSendMode};
 use spl_stake_pool_interface::{set_staker_ix_with_program_id, SetStakerKeys, StakePool};
 
-use crate::{handle_tx_full, with_auto_cb_ixs, ConfigRaw, Subcmd};
+use crate::{handle_tx_full, parse_signer_pubkey_none, with_auto_cb_ixs, ConfigRaw, Subcmd};
 
 #[derive(Args, Debug)]
 #[command(long_about = "(Staker only) set a new staker from a pool config file")]
@@ -35,10 +35,10 @@ impl SetStakerArgs {
 
         let curr_staker = old_staker
             .as_ref()
-            .map_or_else(|| None, |s| parse_signer(s).ok());
+            .map_or_else(|| None, |s| parse_signer_pubkey_none(s).unwrap());
         let curr_staker = curr_staker
             .as_ref()
-            .map_or_else(|| payer.as_ref(), |c| c.as_ref()); // if old-staker is not a valid signer, treat it as None and fall back to payer
+            .map_or_else(|| payer.as_ref(), |c| c.as_ref());
 
         let new_staker = staker.map_or_else(
             || payer.pubkey(),

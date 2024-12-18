@@ -1,7 +1,7 @@
 use borsh::BorshDeserialize;
 use clap::Args;
 use sanctum_associated_token_lib::FindAtaAddressArgs;
-use sanctum_solana_cli_utils::{parse_signer, PubkeySrc, TxSendMode};
+use sanctum_solana_cli_utils::{PubkeySrc, TxSendMode};
 use sanctum_spl_stake_pool_lib::account_resolvers::DepositStakeWithSlippage;
 use solana_readonly_account::keyed::Keyed;
 use solana_sdk::{
@@ -12,7 +12,10 @@ use solana_sdk::{
 use spl_associated_token_account_interface::CreateIdempotentKeys;
 use spl_stake_pool_interface::{StakePool, ValidatorList, ValidatorStakeInfo};
 
-use crate::{handle_tx_full, update_pool, with_auto_cb_ixs, Subcmd, UpdateCtrl, UpdatePoolArgs};
+use crate::{
+    handle_tx_full, parse_signer_pubkey_none, update_pool, with_auto_cb_ixs, Subcmd, UpdateCtrl,
+    UpdatePoolArgs,
+};
 
 #[derive(Args, Debug)]
 #[command(long_about = "Deposit an activated stake account into a stake pool")]
@@ -55,7 +58,11 @@ impl DepositStakeArgs {
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();
 
-        let authority = authority.map(|a| parse_signer(&a).unwrap());
+        let authority = authority.map(|a| {
+            parse_signer_pubkey_none(&a)
+                .unwrap()
+                .expect("authority must be signer, not pubkey")
+        });
         let authority = authority
             .as_ref()
             .map_or_else(|| payer.as_ref(), |authority| authority.as_ref());
