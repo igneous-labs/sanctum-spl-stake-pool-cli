@@ -358,19 +358,27 @@ impl<'a> SyncDelegationConfig<'a> {
         &self,
         itr: impl Iterator<Item = ValidatorDelegationChange>,
     ) -> impl Iterator<Item = Instruction> {
-        let ephemeral_stake_seed = 0;
         let stake_pool = self.pool;
         let staker = self.staker.pubkey();
         let withdraw_authority = self.withdraw_auth();
         let validator_list = self.validator_list;
         let reserve_stake = self.reserve;
         let program_id = self.program_id;
-        itr.filter_map(
-            move |ValidatorDelegationChange {
-                      vote,
-                      ty,
-                      transient_seed_suffix,
-                  }| {
+        itr.enumerate().filter_map(
+            move |(
+                i,
+                ValidatorDelegationChange {
+                    vote,
+                    ty,
+                    transient_seed_suffix,
+                },
+            )| {
+                // cannot use same ephemeral stake seed in same tx because
+                // solana accounts are not cleaned up until the end of the tx,
+                // so just use the index in itr as ephemeral_stake_seed
+                //
+                // as-safety: no pool has >u64::MAX validators
+                let ephemeral_stake_seed = i as u64;
                 let (validator_stake_account, _bump) = FindValidatorStakeAccount {
                     pool: stake_pool,
                     vote,

@@ -20,7 +20,7 @@ pub const MAX_ADD_VALIDATORS_IX_PER_TX: usize = 7;
 
 pub const MAX_REMOVE_VALIDATOR_IXS_ENUM_PER_TX: usize = 5;
 
-pub const MAX_INCREASE_VALIDATOR_STAKE_IX_PER_TX: usize = 4;
+pub const MAX_INCREASE_VALIDATOR_STAKE_IX_PER_TX: usize = 3;
 
 const CU_BUFFER_RATIO: f64 = 1.1;
 
@@ -233,8 +233,8 @@ mod tests {
                 &[]
             )
         );
-         */
-        // size = 1188
+        */
+        // size = 1114
         assert_tx_with_cb_ixs_within_size_limits(&payer.pubkey(), ixs.into_iter(), &[]);
     }
 }
