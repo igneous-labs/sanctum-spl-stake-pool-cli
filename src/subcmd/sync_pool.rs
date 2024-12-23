@@ -1,8 +1,9 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 
 use borsh::BorshDeserialize;
 use clap::Args;
 use sanctum_solana_cli_utils::{parse_signer, PubkeySrc, TxSendMode};
+use solana_sdk::{pubkey::Pubkey, signature::NullSigner};
 use spl_stake_pool_interface::StakePool;
 
 use crate::{
@@ -70,7 +71,10 @@ impl SyncPoolArgs {
             );
         }
         // allow pubkey signers to work with multisig programs
-        let new_manager = manager.as_ref().map(|s| parse_signer(s).unwrap());
+        let new_manager = manager.as_ref().map(|s| match Pubkey::from_str(s) {
+            Ok(pk) => Box::new(NullSigner::new(&pk)),
+            Err(_e) => parse_signer(s).unwrap(),
+        });
         let new_manager = new_manager.as_ref().map_or_else(
             || curr_manager,
             |nm| {
