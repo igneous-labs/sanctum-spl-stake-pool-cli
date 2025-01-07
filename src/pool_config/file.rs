@@ -160,7 +160,7 @@ pub struct ConfigTomlFile<'a> {
     pub pool: &'a ConfigRaw,
 }
 
-impl<'a> std::fmt::Display for ConfigTomlFile<'a> {
+impl std::fmt::Display for ConfigTomlFile<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&toml::to_string_pretty(self).unwrap())
     }

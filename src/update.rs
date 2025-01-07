@@ -160,11 +160,13 @@ mod tests {
     struct AccountData(pub Vec<u8>);
 
     impl ReadonlyAccountData for AccountData {
-        type SliceDeref<'s> = Vec<u8>
+        type SliceDeref<'s>
+            = Vec<u8>
         where
             Self: 's;
 
-        type DataDeref<'d> = &'d Vec<u8>
+        type DataDeref<'d>
+            = &'d Vec<u8>
         where
             Self: 'd;
 

@@ -76,7 +76,7 @@ impl<'a> SyncValidatorListConfig<'a> {
 }
 
 // set preferred validators
-impl<'a> SyncValidatorListConfig<'a> {
+impl SyncValidatorListConfig<'_> {
     pub fn preferred_validator_changeset(
         &self,
         stake_pool: &StakePool,
@@ -132,7 +132,7 @@ impl<'a> SyncValidatorListConfig<'a> {
 }
 
 // add/remove validators
-impl<'a> SyncValidatorListConfig<'a> {
+impl SyncValidatorListConfig<'_> {
     /// Returns (add, remove)
     pub fn add_remove_changeset<'me>(
         &'me self,
