@@ -250,7 +250,7 @@ pub struct MockPool<'a> {
     pub pool: &'a StakePool,
 }
 
-impl<'a> IntoAccount for MockPool<'a> {
+impl IntoAccount for MockPool<'_> {
     fn into_account(self) -> Account {
         let mut data = vec![0; STAKE_POOL_SIZE];
         self.pool.serialize(&mut data.as_mut_slice()).unwrap();
@@ -269,7 +269,7 @@ pub struct MockValidatorList<'a> {
     pub validator_list: &'a ValidatorList,
 }
 
-impl<'a> IntoAccount for MockValidatorList<'a> {
+impl IntoAccount for MockValidatorList<'_> {
     fn into_account(self) -> Account {
         let max_validators = self.validator_list.header.max_validators;
         // like to use get_instance_packed_len() here

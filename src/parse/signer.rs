@@ -1,7 +1,10 @@
 use std::{error::Error, str::FromStr};
 
 use sanctum_solana_cli_utils::parse_signer;
-use solana_sdk::{pubkey::Pubkey, signer::Signer};
+use solana_sdk::{
+    pubkey::Pubkey,
+    signer::{null_signer::NullSigner, Signer},
+};
 
 /// Returns
 /// - `Ok(None)` if `s` is a pubkey,
@@ -16,5 +19,13 @@ pub fn parse_signer_pubkey_none(s: &str) -> Result<Option<Box<dyn Signer>>, Box<
     match Pubkey::from_str(s) {
         Ok(_pk) => Ok(None),
         Err(_) => parse_signer(s).map(Some),
+    }
+}
+
+/// `NullSigner` is returned if `s` is a pubkey
+pub fn parse_signer_allow_pubkey(s: &str) -> Result<Box<dyn Signer>, Box<dyn Error>> {
+    match Pubkey::from_str(s) {
+        Ok(pk) => Ok(Box::new(NullSigner::new(&pk))),
+        Err(_e) => parse_signer(s),
     }
 }
