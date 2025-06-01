@@ -113,16 +113,21 @@ impl DecreaseValidatorStakeArgs {
         })
         .run_for_prog(&program_id);
 
-        let mut fetched = rpc
+        let fetched = rpc
             .get_multiple_accounts(&[vsa_pubkey, tsa_pubkey])
             .await
             .unwrap();
-        let tsa = fetched
-            .pop()
-            .unwrap()
-            .map(|acc| StakeStateV2::deserialize(&mut acc.data.as_slice()).unwrap());
-        let vsa = StakeStateV2::deserialize(&mut fetched.pop().unwrap().unwrap().data.as_slice())
-            .unwrap();
+        let [Some(vsa), tsa] = fetched.as_slice() else {
+            panic!("No vsa found");
+        };
+        let tsa = tsa.as_ref().map_or_else(
+            || None,
+            |acc| {
+                (acc.owner == solana_program::stake::program::ID)
+                    .then(|| StakeStateV2::deserialize(&mut acc.data.as_slice()).unwrap())
+            },
+        );
+        let vsa = StakeStateV2::deserialize(&mut vsa.data.as_slice()).unwrap();
 
         let sdc = SyncDelegationConfig {
             program_id,
