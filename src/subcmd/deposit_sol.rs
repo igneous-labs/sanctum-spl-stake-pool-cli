@@ -103,6 +103,7 @@ impl DepositSolArgs {
             validator_list_entries: &validators,
             fee_limit_cb: args.fee_limit_cb,
             ctrl: UpdateCtrl::IfNeeded,
+            no_merge: false,
         })
         .await;
 

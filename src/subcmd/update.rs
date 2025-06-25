@@ -29,6 +29,14 @@ pub struct UpdateArgs {
     pub ctrl: UpdateCtrl,
 
     #[arg(
+        long,
+        short,
+        help = "UpdateStakePoolBalance instruction's `no_merge` parameter",
+        default_value_t = false
+    )]
+    pub no_merge: bool,
+
+    #[arg(
         help = "Pubkey of the pool to update",
         value_parser = StringValueParser::new().try_map(|s| Pubkey::from_str(&s)),
     )]
@@ -37,7 +45,11 @@ pub struct UpdateArgs {
 
 impl UpdateArgs {
     pub async fn run(args: crate::Args) {
-        let Self { pool, ctrl } = match args.subcmd {
+        let Self {
+            pool,
+            ctrl,
+            no_merge,
+        } = match args.subcmd {
             Subcmd::Update(a) => a,
             _ => unreachable!(),
         };
@@ -74,6 +86,7 @@ impl UpdateArgs {
             validator_list_entries: &validators,
             fee_limit_cb: args.fee_limit_cb,
             ctrl,
+            no_merge,
         })
         .await;
     }

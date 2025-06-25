@@ -97,6 +97,7 @@ impl SyncValidatorListArgs {
             validator_list_entries: &old_validators,
             fee_limit_cb: args.fee_limit_cb,
             ctrl: UpdateCtrl::IfNeeded,
+            no_merge: false,
         })
         .await;
 
