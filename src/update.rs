@@ -52,6 +52,7 @@ pub struct UpdatePoolArgs<'a> {
     pub validator_list_entries: &'a [ValidatorStakeInfo],
     pub fee_limit_cb: u64,
     pub ctrl: UpdateCtrl,
+    pub no_merge: bool,
 }
 
 // ignores entries already updated for this epoch
@@ -66,6 +67,7 @@ pub async fn update_pool(
         validator_list_entries,
         fee_limit_cb,
         ctrl,
+        no_merge,
     }: UpdatePoolArgs<'_>,
 ) {
     let sp = StakePool::deserialize(&mut stake_pool.account.data.as_slice()).unwrap();
@@ -98,7 +100,7 @@ pub async fn update_pool(
                     chunk,
                     UpdateValidatorListBalanceIxArgs {
                         start_index: start_index.try_into().unwrap(),
-                        no_merge: false,
+                        no_merge,
                     },
                 )
                 .unwrap()];
