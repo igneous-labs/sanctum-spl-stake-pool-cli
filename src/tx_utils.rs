@@ -3,15 +3,17 @@ use sanctum_solana_cli_utils::{
 };
 use sanctum_solana_client_utils::{
     buffer_compute_units, calc_compute_unit_price, estimate_compute_unit_limit_nonblocking,
-    to_est_cu_sim_tx, SortedSigners,
+    SortedSigners,
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
     address_lookup_table::AddressLookupTableAccount,
     compute_budget::ComputeBudgetInstruction,
+    hash::Hash,
     instruction::Instruction,
-    message::{v0::Message, VersionedMessage},
+    message::{v0::Message, CompileError, VersionedMessage},
     pubkey::Pubkey,
+    signature::Signature,
     signer::Signer,
     transaction::VersionedTransaction,
 };
@@ -25,6 +27,8 @@ pub const MAX_INCREASE_VALIDATOR_STAKE_IX_PER_TX: usize = 3;
 const CU_BUFFER_RATIO: f64 = 1.1;
 
 const CUS_REQUIRED_FOR_SET_CU_LIMIT_IXS: u32 = 300;
+
+const BLOCK_CU_LIMIT: u32 = 60_000_000;
 
 pub async fn with_auto_cb_ixs(
     rpc: &RpcClient,
@@ -76,6 +80,26 @@ pub async fn handle_tx_full(
     )
     .await
     .unwrap();
+}
+
+/// Copied-pastad from sanctum-solana-utils but modified to simulate with CU limit = block limit
+fn to_est_cu_sim_tx(
+    payer_pk: &Pubkey,
+    ixs: &[Instruction],
+    luts: &[AddressLookupTableAccount],
+) -> Result<VersionedTransaction, CompileError> {
+    // must set CU limit else default 200k will be used and expense txs will fail sim
+    let ixs: Vec<_> = core::iter::once(ComputeBudgetInstruction::set_compute_unit_limit(
+        BLOCK_CU_LIMIT,
+    ))
+    .chain(ixs.iter().cloned())
+    .collect();
+    let message =
+        VersionedMessage::V0(Message::try_compile(payer_pk, &ixs, luts, Hash::default())?);
+    Ok(VersionedTransaction {
+        signatures: vec![Signature::default(); message.header().num_required_signatures.into()],
+        message,
+    })
 }
 
 #[cfg(test)]
