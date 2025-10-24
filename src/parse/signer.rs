@@ -24,17 +24,17 @@ pub fn parse_signer_pubkey_none(s: &str) -> Result<Option<Box<dyn Signer>>, Box<
 
 // Need to use macro here instead of fn because of differences in &dyn Signer scope
 // between $payer and signer parsed from $arg_string_opt
-macro_rules! parse_signer_fallback_payer {
-    ($arg_string_opt:ident, $payer:expr) => {
+macro_rules! parse_signer_pubkey_none_fallback {
+    ($arg_string_opt:ident, $fallback:expr) => {
         let $arg_string_opt = $arg_string_opt
             .as_ref()
             .map_or_else(|| None, |s| crate::parse_signer_pubkey_none(s).unwrap());
         let $arg_string_opt = $arg_string_opt
             .as_ref()
-            .map_or_else(|| $payer.as_ref(), |s| s.as_ref());
+            .map_or_else(|| $fallback.as_ref(), |s| s.as_ref());
     };
 }
-pub(crate) use parse_signer_fallback_payer;
+pub(crate) use parse_signer_pubkey_none_fallback;
 
 /// `NullSigner` is returned if `s` is a pubkey
 pub fn parse_signer_allow_pubkey(s: &str) -> Result<Box<dyn Signer>, Box<dyn Error>> {

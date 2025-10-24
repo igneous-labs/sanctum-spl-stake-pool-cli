@@ -6,7 +6,7 @@ use sanctum_solana_cli_utils::{PubkeySrc, TxSendMode};
 use spl_stake_pool_interface::StakePool;
 
 use crate::{
-    parse_signer_allow_pubkey, parse_signer_fallback_payer,
+    parse_signer_allow_pubkey, parse_signer_pubkey_none_fallback,
     pool_config::{ConfigRaw, SyncPoolConfig},
     tx_utils::{handle_tx_full, with_auto_cb_ixs},
 };
@@ -56,7 +56,7 @@ impl SyncPoolArgs {
         let stake_pool: StakePool =
             StakePool::deserialize(&mut fetched_pool.data.as_slice()).unwrap();
 
-        parse_signer_fallback_payer!(old_manager, payer);
+        parse_signer_pubkey_none_fallback!(old_manager, payer);
 
         if old_manager.pubkey() != stake_pool.manager {
             panic!(
