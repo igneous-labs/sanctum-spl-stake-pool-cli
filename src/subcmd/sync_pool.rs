@@ -6,8 +6,8 @@ use sanctum_solana_cli_utils::{PubkeySrc, TxSendMode};
 use spl_stake_pool_interface::StakePool;
 
 use crate::{
-    parse_signer_allow_pubkey, parse_signer_pubkey_none,
     pool_config::{ConfigRaw, SyncPoolConfig},
+    ps,
     tx_utils::{handle_tx_full, with_auto_cb_ixs},
 };
 
@@ -56,33 +56,18 @@ impl SyncPoolArgs {
         let stake_pool: StakePool =
             StakePool::deserialize(&mut fetched_pool.data.as_slice()).unwrap();
 
-        let curr_manager = old_manager
-            .as_ref()
-            .map_or_else(|| None, |s| parse_signer_pubkey_none(s).unwrap());
-        let curr_manager = curr_manager
-            .as_ref()
-            .map_or_else(|| payer.as_ref(), |c| c.as_ref());
-        if curr_manager.pubkey() != stake_pool.manager {
+        ps!(old_manager, @fb payer.as_ref(), @sm args.send_mode);
+
+        if old_manager.pubkey() != stake_pool.manager {
             panic!(
                 "Wrong manager. Expecting {}, got {}",
                 stake_pool.manager,
-                curr_manager.pubkey()
+                old_manager.pubkey()
             );
         }
-        // allow pubkey signers to work with multisig programs
-        let new_manager = manager
-            .as_ref()
-            .map(|s| parse_signer_allow_pubkey(s).unwrap());
-        let new_manager = new_manager.as_ref().map_or_else(
-            || curr_manager,
-            |nm| {
-                if nm.pubkey() == curr_manager.pubkey() {
-                    curr_manager
-                } else {
-                    nm.as_ref()
-                }
-            },
-        );
+
+        let new_manager = manager;
+        ps!(new_manager, @fb old_manager, @sm args.send_mode);
 
         let [manager_fee_account, staker] = [
             (manager_fee_account, stake_pool.manager_fee_account),
@@ -119,7 +104,7 @@ impl SyncPoolArgs {
             program_id,
             pool,
             payer: payer.as_ref(),
-            manager: curr_manager,
+            manager: old_manager,
             new_manager,
             staker,
             manager_fee_account,

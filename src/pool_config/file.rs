@@ -148,8 +148,7 @@ impl ConfigRaw {
     pub fn read_from_path<P: AsRef<Path>>(path: P) -> Result<ConfigRaw, std::io::Error> {
         // toml crate only handles strings, not io::Read lol
         let s = read_to_string(path)?;
-        let ConfigTomlFileOwned { pool } =
-            toml::from_str(&s).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let ConfigTomlFileOwned { pool } = toml::from_str(&s).map_err(std::io::Error::other)?;
         Ok(pool)
     }
 }
@@ -185,7 +184,7 @@ impl SyncDelegationConfigToml {
         // toml crate only handles strings, not io::Read lol
         let s = read_to_string(path)?;
         let SyncDelegationConfigTomlFile { pool } =
-            toml::from_str(&s).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            toml::from_str(&s).map_err(std::io::Error::other)?;
         Ok(pool)
     }
 }

@@ -1,7 +1,9 @@
 use borsh::BorshSerialize;
+use rand::Rng;
 use sanctum_spl_stake_pool_lib::{
     account_resolvers::{Initialize, InitializeWithDepositAuthArgs},
-    lamports_for_new_vsa, min_reserve_lamports, FindWithdrawAuthority, STAKE_POOL_SIZE,
+    lamports_for_new_vsa, min_reserve_lamports, FindDepositAuthority, FindWithdrawAuthority,
+    STAKE_POOL_SIZE,
 };
 use solana_readonly_account::{keyed::Keyed, ReadonlyAccountData, ReadonlyAccountOwner};
 use solana_sdk::{
@@ -23,14 +25,28 @@ use spl_token_interface::{
     set_authority_ix_with_program_id, AuthorityType, SetAuthorityIxArgs, SetAuthorityKeys,
 };
 
+/// Generates a random string seed for pubkey create_with_seed
+///
+/// Seeds are strings with len <= MAX_SEED_LEN = 32
+///
+/// This generates a random string between length 1..=MAX_SEED_LEN, with each character
+/// being a random ascii printable char 32u8..=126u8
+pub fn rand_seed() -> String {
+    let mut rng = rand::thread_rng();
+    let len = rng.gen_range(1, 33);
+    let mut res = String::new();
+    (0..len).for_each(|_| {
+        let c: u8 = rng.gen_range(32, 127);
+        res.push(c.into());
+    });
+    res
+}
+
 #[derive(Debug)]
 pub struct CreateConfig<'a, T> {
     pub mint: Keyed<T>,
     pub program_id: Pubkey,
     pub payer: &'a (dyn Signer + 'static),
-    pub pool: &'a (dyn Signer + 'static),
-    pub validator_list: &'a (dyn Signer + 'static),
-    pub reserve: &'a (dyn Signer + 'static),
     pub manager: &'a (dyn Signer + 'static),
     pub manager_fee_account: Pubkey,
     pub staker: Pubkey,
@@ -44,14 +60,42 @@ pub struct CreateConfig<'a, T> {
     // added immediately
     pub starting_validators: usize,
     pub rent: &'a Rent,
+
+    pub pool_seed: String,
+    pub validator_list_seed: String,
+    pub reserve_seed: String,
 }
 
 impl<'a, T: ReadonlyAccountOwner + ReadonlyAccountData> CreateConfig<'a, T> {
+    pub fn pool_addr(&self) -> Pubkey {
+        Pubkey::create_with_seed(&self.payer.pubkey(), &self.pool_seed, &self.program_id).unwrap()
+    }
+
+    pub fn validator_list_addr(&self) -> Pubkey {
+        Pubkey::create_with_seed(
+            &self.payer.pubkey(),
+            &self.validator_list_seed,
+            &self.program_id,
+        )
+        .unwrap()
+    }
+
+    pub fn reserve_addr(&self) -> Pubkey {
+        Pubkey::create_with_seed(
+            &self.payer.pubkey(),
+            &self.reserve_seed,
+            &stake::program::ID,
+        )
+        .unwrap()
+    }
+
     // split from initialize_tx due to tx size limits
     pub fn create_reserve_tx_ixs(&self) -> std::io::Result<[Instruction; 2]> {
-        let create_reserve_ix = system_instruction::create_account(
+        let create_reserve_ix = system_instruction::create_account_with_seed(
             &self.payer.pubkey(),
-            &self.reserve.pubkey(),
+            &self.reserve_addr(),
+            &self.payer.pubkey(),
+            &self.reserve_seed,
             min_reserve_lamports(self.rent).saturating_add(
                 u64::try_from(self.starting_validators)
                     .unwrap()
@@ -61,29 +105,29 @@ impl<'a, T: ReadonlyAccountOwner + ReadonlyAccountData> CreateConfig<'a, T> {
             &stake::program::ID,
         );
         let (pool_withdraw_auth, _bump) = FindWithdrawAuthority {
-            pool: self.pool.pubkey(),
+            pool: self.pool_addr(),
         }
         .run_for_prog(&self.program_id);
         let init_reserve_ix = stake::instruction::initialize(
-            &self.reserve.pubkey(),
+            &self.reserve_addr(),
             &Authorized::auto(&pool_withdraw_auth),
             &Lockup::default(),
         );
         Ok([create_reserve_ix, init_reserve_ix])
     }
 
-    pub fn create_reserve_tx_signers_maybe_dup(&self) -> [&'a dyn Signer; 2] {
-        [self.payer, self.reserve]
+    pub fn create_reserve_tx_signers_maybe_dup(&self) -> [&'a dyn Signer; 1] {
+        [self.payer]
     }
 
-    pub fn initialize_tx_signers_maybe_dup(&self) -> [&'a dyn Signer; 4] {
-        [self.payer, self.pool, self.validator_list, self.manager]
+    pub fn initialize_tx_signers_maybe_dup(&self) -> [&'a dyn Signer; 2] {
+        [self.payer, self.manager]
     }
 
     // Worst case transaction size is 1251 with 2x computebudget instructions (over limit)
     pub fn initialize_tx_ixs(&self) -> std::io::Result<[Instruction; 4]> {
         let (pool_withdraw_auth, _bump) = FindWithdrawAuthority {
-            pool: self.pool.pubkey(),
+            pool: self.pool_addr(),
         }
         .run_for_prog(&self.program_id);
         let transfer_mint_auth_ix = set_authority_ix_with_program_id(
@@ -119,27 +163,31 @@ impl<'a, T: ReadonlyAccountOwner + ReadonlyAccountData> CreateConfig<'a, T> {
             ],
         };
         let validator_list_size = dummy_validator_list.try_to_vec()?.len();
-        let create_validator_list_ix = system_instruction::create_account(
+        let create_validator_list_ix = system_instruction::create_account_with_seed(
             &self.payer.pubkey(),
-            &self.validator_list.pubkey(),
+            &self.validator_list_addr(),
+            &self.payer.pubkey(),
+            &self.validator_list_seed,
             self.rent.minimum_balance(validator_list_size),
             validator_list_size.try_into().unwrap(),
             &self.program_id,
         );
-        let create_pool_ix = system_instruction::create_account(
+        let create_pool_ix = system_instruction::create_account_with_seed(
             &self.payer.pubkey(),
-            &self.pool.pubkey(),
+            &self.pool_addr(),
+            &self.payer.pubkey(),
+            &self.pool_seed,
             self.rent.minimum_balance(STAKE_POOL_SIZE),
             STAKE_POOL_SIZE.try_into().unwrap(),
             &self.program_id,
         );
         let initialize = Initialize {
             pool_token_mint: &self.mint,
-            stake_pool: self.pool.pubkey(),
+            stake_pool: self.pool_addr(),
             manager: self.manager.pubkey(),
             staker: self.staker,
-            validator_list: self.validator_list.pubkey(),
-            reserve_stake: self.reserve.pubkey(),
+            validator_list: self.validator_list_addr(),
+            reserve_stake: self.reserve_addr(),
             manager_fee_account: self.manager_fee_account,
         };
         let mut init_ix = initialize_ix_with_program_id(
@@ -158,12 +206,18 @@ impl<'a, T: ReadonlyAccountOwner + ReadonlyAccountData> CreateConfig<'a, T> {
         // initialize ix sets both sol and stake deposit auth to the same pubkey if set.
         // Use stake deposit as source of truth
         if let Some(deposit_auth) = self.deposit_auth {
-            init_ix.accounts = Vec::from(initialize.resolve_with_deposit_auth(
-                InitializeWithDepositAuthArgs {
-                    deposit_auth,
-                    program_id: self.program_id,
-                },
-            ));
+            let (default_stake_deposit_auth, _bump) = FindDepositAuthority {
+                pool: self.pool_addr(),
+            }
+            .run_for_prog(&self.program_id);
+            if deposit_auth != default_stake_deposit_auth {
+                init_ix.accounts = Vec::from(initialize.resolve_with_deposit_auth(
+                    InitializeWithDepositAuthArgs {
+                        deposit_auth,
+                        program_id: self.program_id,
+                    },
+                ));
+            }
         }
         Ok([
             transfer_mint_auth_ix,
@@ -188,13 +242,8 @@ mod tests {
 
     #[test]
     fn create_ixs_tx_size_limit() {
-        const N_SIGNERS: usize = 5;
-
-        let keys: Vec<Box<dyn Signer>> = (0..N_SIGNERS)
-            .map(|_| Box::new(Keypair::new()).into())
-            .collect();
-        let [payer, pool, validator_list, reserve, manager]: &[Box<dyn Signer>; N_SIGNERS] =
-            keys.as_slice().try_into().unwrap();
+        let [payer, manager]: [Box<dyn Signer>; _] =
+            core::array::from_fn(|_| Box::new(Keypair::new()).into());
         let mint_account = mock_tokenkeg_mint(MockMintArgs {
             mint_authority: Some(Pubkey::new_unique()),
             freeze_authority: None,
@@ -216,9 +265,6 @@ mod tests {
             },
             program_id: spl_stake_pool_interface::ID,
             payer: payer.as_ref(),
-            pool: pool.as_ref(),
-            validator_list: validator_list.as_ref(),
-            reserve: reserve.as_ref(),
             manager: manager.as_ref(),
             manager_fee_account,
             staker: Pubkey::new_unique(),
@@ -239,6 +285,9 @@ mod tests {
             max_validators: 13,
             starting_validators: 1,
             rent: &Rent::default(),
+            pool_seed: rand_seed(),
+            validator_list_seed: rand_seed(),
+            reserve_seed: rand_seed(),
         };
 
         assert_tx_with_cb_ixs_within_size_limits(

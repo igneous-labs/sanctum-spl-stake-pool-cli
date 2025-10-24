@@ -6,6 +6,51 @@ use solana_sdk::{
     signer::{null_signer::NullSigner, Signer},
 };
 
+/// Need to use macro here instead of fn because of differences in &dyn Signer reference scope
+/// between $fallback and signer parsed from $arg.
+///
+/// Output of this macro is declare $arg as `&dyn Signer`
+macro_rules! ps {
+    // @fb is fallback_signer: &dyn Signer
+    // @sm is args.send_mode: TxSendMode
+
+    // with fallback
+    (
+        $arg:ident,
+        @fb $fallback:expr,
+        @sm $sm:expr
+    ) => {
+        ps!($arg, @sm $sm, @internal);
+        let $arg = $arg.as_ref().map_or_else(|| $fallback, |s| s.as_ref());
+    };
+
+    // no fallback, simply unwrap and panic if None
+    (
+        $arg:ident,
+        @sm $sm:expr
+    ) => {
+        ps!($arg, @sm $sm, @internal);
+        let $arg = $arg.as_ref().unwrap();
+    };
+
+    (
+        $arg:ident,
+        @sm $sm:expr,
+        @internal
+    ) => {
+        let $arg = match $sm {
+            sanctum_solana_cli_utils::TxSendMode::DumpMsg
+            | sanctum_solana_cli_utils::TxSendMode::SimOnly => $arg
+                .as_ref()
+                .map(|s| crate::parse_signer_allow_pubkey(s).unwrap()),
+            sanctum_solana_cli_utils::TxSendMode::SendActual => $arg
+                .as_ref()
+                .map_or_else(|| None, |s| crate::parse_signer_pubkey_none(s).unwrap()),
+        };
+    };
+}
+pub(crate) use ps;
+
 /// Returns
 /// - `Ok(None)` if `s` is a pubkey,
 /// - `Ok(Some(signer))` if `s` is a valid signer e.g. keypair file path
