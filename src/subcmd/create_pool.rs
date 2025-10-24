@@ -19,12 +19,11 @@ use spl_stake_pool_interface::{AccountType, Fee, FutureEpochFee, Lockup, StakePo
 use spl_token_2022::{extension::StateWithExtensions, state::Mint};
 
 use crate::{
-    parse::filter_default_stake_deposit_auth,
     pool_config::{
         print_adding_validators_msg, ConfigRaw, CreateConfig, SyncPoolConfig,
         SyncValidatorListConfig,
     },
-    ps,
+    ps, rand_seed,
     subcmd::Subcmd,
     tx_utils::{handle_tx_full, with_auto_cb_ixs, MAX_ADD_VALIDATORS_IX_PER_TX},
 };
@@ -46,9 +45,6 @@ impl CreatePoolArgs {
         let ConfigRaw {
             program,
             mint,
-            pool,
-            validator_list,
-            reserve,
             manager,
             manager_fee_account,
             staker,
@@ -75,15 +71,7 @@ impl CreatePoolArgs {
             .expect("stake pool program was not provided")
             .program_id();
 
-        // preprocess fields
-        let [pool, validator_list, reserve] = [
-            pool.as_ref(),
-            validator_list.as_ref(),
-            reserve.as_ref().map(|r| &r.address),
-        ];
-        ps!(pool, @sm args.send_mode);
-        ps!(validator_list, @sm args.send_mode);
-        ps!(reserve, @sm args.send_mode);
+        let [pool_seed, validator_list_seed, reserve_seed] = core::array::from_fn(|_| rand_seed());
 
         ps!(manager, @fb payer.as_ref(), @sm args.send_mode);
 
@@ -119,18 +107,6 @@ impl CreatePoolArgs {
             .map(|s| PubkeySrc::parse(&s).unwrap().pubkey())
             .unwrap_or(manager_fee_ata);
 
-        let mut fetched = rpc
-            .get_multiple_accounts(&[manager_fee_account, reserve.pubkey()])
-            .await
-            .unwrap();
-        let reserve_fetched = fetched.pop().unwrap();
-        let manager_fee_fetched = fetched.pop().unwrap();
-
-        let (default_stake_deposit_auth, _bump) = FindDepositAuthority {
-            pool: pool.pubkey(),
-        }
-        .run_for_prog(&program_id);
-
         // initialize sets sol/stake fee to the same number
         // use the higher value of the two to avoid per-epoch max withdrawal fee increase limits
         let [stake_deposit_referral_fee, sol_deposit_referral_fee] =
@@ -158,26 +134,7 @@ impl CreatePoolArgs {
         ]
         .map(|(f1, f2)| select_higher_fee(f1, f2));
 
-        let staker = staker.map(|s| PubkeySrc::parse(&s).unwrap().pubkey());
-        let staker = staker.unwrap_or_else(|| manager.pubkey());
-        let stake_deposit_auth = stake_deposit_auth.map_or_else(
-            || None,
-            |s| {
-                filter_default_stake_deposit_auth(
-                    PubkeySrc::parse(&s).unwrap().pubkey(),
-                    &default_stake_deposit_auth,
-                )
-            },
-        );
-
-        let [sol_deposit_auth, sol_withdraw_auth, preferred_deposit_validator, preferred_withdraw_validator] =
-            [
-                sol_deposit_auth,
-                sol_withdraw_auth,
-                preferred_deposit_validator,
-                preferred_withdraw_validator,
-            ]
-            .map(|opt| opt.map(|s| PubkeySrc::parse(&s).unwrap().pubkey()));
+        let stake_deposit_auth = stake_deposit_auth.map(|s| PubkeySrc::parse(&s).unwrap().pubkey());
 
         let cc = CreateConfig {
             mint: Keyed {
@@ -186,9 +143,6 @@ impl CreatePoolArgs {
             },
             program_id,
             payer: payer.as_ref(),
-            pool: pool.as_ref(),
-            validator_list: validator_list.as_ref(),
-            reserve: reserve.as_ref(),
             manager,
             manager_fee_account,
             // set staker to initial manager first,
@@ -203,12 +157,39 @@ impl CreatePoolArgs {
             max_validators,
             rent: &rent,
             starting_validators,
+            pool_seed,
+            validator_list_seed,
+            reserve_seed,
         };
+
+        let mut fetched = rpc
+            .get_multiple_accounts(&[manager_fee_account, cc.reserve_addr()])
+            .await
+            .unwrap();
+        let reserve_fetched = fetched.pop().unwrap();
+        let manager_fee_fetched = fetched.pop().unwrap();
+
+        let staker = staker.map(|s| PubkeySrc::parse(&s).unwrap().pubkey());
+        let staker = staker.unwrap_or_else(|| manager.pubkey());
+
+        let (default_stake_deposit_auth, _bump) = FindDepositAuthority {
+            pool: cc.pool_addr(),
+        }
+        .run_for_prog(&program_id);
+
+        let [sol_deposit_auth, sol_withdraw_auth, preferred_deposit_validator, preferred_withdraw_validator] =
+            [
+                sol_deposit_auth,
+                sol_withdraw_auth,
+                preferred_deposit_validator,
+                preferred_withdraw_validator,
+            ]
+            .map(|opt| opt.map(|s| PubkeySrc::parse(&s).unwrap().pubkey()));
 
         let mut first_ixs = if let Some(reserve_acc) = reserve_fetched {
             let ss = StakeStateV2::deserialize(&mut reserve_acc.data.as_slice()).unwrap();
             let (sp_withdraw_auth, _bump) = FindWithdrawAuthority {
-                pool: pool.pubkey(),
+                pool: cc.pool_addr(),
             }
             .run_for_prog(&program_id);
             if ss.authorized().unwrap() != Authorized::auto(&sp_withdraw_auth) {
@@ -286,8 +267,8 @@ impl CreatePoolArgs {
             manager: cc.manager.pubkey(),
             staker: cc.staker,
             stake_deposit_authority: stake_deposit_auth.unwrap_or(default_stake_deposit_auth),
-            validator_list: cc.validator_list.pubkey(),
-            reserve_stake: cc.reserve.pubkey(),
+            validator_list: cc.validator_list_addr(),
+            reserve_stake: cc.reserve_addr(),
             pool_mint: cc.mint.pubkey,
             manager_fee_account,
             token_program: *cc.mint.owner(),
@@ -325,9 +306,9 @@ impl CreatePoolArgs {
             program_id,
             payer: payer.as_ref(),
             staker: manager,
-            pool: pool.pubkey(),
-            validator_list: validator_list.pubkey(),
-            reserve: reserve.pubkey(),
+            pool: cc.pool_addr(),
+            validator_list: cc.validator_list_addr(),
+            reserve: cc.reserve_addr(),
             preferred_deposit_validator,
             preferred_withdraw_validator,
             validators: validators
@@ -408,7 +389,7 @@ impl CreatePoolArgs {
 
         let spc = SyncPoolConfig {
             program_id,
-            pool: cc.pool.pubkey(),
+            pool: cc.pool_addr(),
             payer: cc.payer,
             manager,
             new_manager: manager,
