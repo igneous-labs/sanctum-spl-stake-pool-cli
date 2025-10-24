@@ -9,11 +9,11 @@ use solana_sdk::{clock::Clock, pubkey::Pubkey, rent::Rent, sysvar};
 use spl_stake_pool_interface::{StakePool, ValidatorList};
 
 use crate::{
-    parse_signer_pubkey_none_fallback,
     pool_config::{
         print_adding_validators_msg, print_removing_validators_msg, ConfigRaw,
         SyncValidatorListConfig,
     },
+    ps,
     tx_utils::{
         handle_tx_full, with_auto_cb_ixs, MAX_ADD_VALIDATORS_IX_PER_TX,
         MAX_REMOVE_VALIDATOR_IXS_ENUM_PER_TX,
@@ -54,7 +54,7 @@ impl SyncValidatorListArgs {
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();
 
-        parse_signer_pubkey_none_fallback!(staker, payer);
+        ps!(staker, @fb payer.as_ref(), @sm args.send_mode);
 
         let [preferred_deposit_validator, preferred_withdraw_validator] =
             [preferred_deposit_validator, preferred_withdraw_validator]

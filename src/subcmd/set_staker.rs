@@ -5,9 +5,7 @@ use clap::Args;
 use sanctum_solana_cli_utils::{PubkeySrc, TxSendMode};
 use spl_stake_pool_interface::{set_staker_ix_with_program_id, SetStakerKeys, StakePool};
 
-use crate::{
-    handle_tx_full, parse_signer_pubkey_none_fallback, with_auto_cb_ixs, ConfigRaw, Subcmd,
-};
+use crate::{handle_tx_full, ps, with_auto_cb_ixs, ConfigRaw, Subcmd};
 
 #[derive(Args, Debug)]
 #[command(long_about = "(Staker only) set a new staker from a pool config file")]
@@ -35,7 +33,7 @@ impl SetStakerArgs {
 
         let pool = PubkeySrc::parse(pool.as_ref().unwrap()).unwrap().pubkey();
 
-        parse_signer_pubkey_none_fallback!(old_staker, payer);
+        ps!(old_staker, @fb payer.as_ref(), @sm args.send_mode);
 
         let new_staker = staker.map_or_else(
             || payer.pubkey(),

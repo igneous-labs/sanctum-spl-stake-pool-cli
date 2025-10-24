@@ -24,8 +24,7 @@ use spl_stake_pool_interface::{
 };
 
 use crate::{
-    handle_tx_full, parse_signer_allow_pubkey, update_pool, with_auto_cb_ixs, Subcmd, UpdateCtrl,
-    UpdatePoolArgs,
+    handle_tx_full, ps, update_pool, with_auto_cb_ixs, Subcmd, UpdateCtrl, UpdatePoolArgs,
 };
 
 #[derive(Args, Debug)]
@@ -88,11 +87,8 @@ impl WithdrawStakeArgs {
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();
 
-        // allow pubkey signers to work with multisig programs
-        let authority = authority.map(|s| parse_signer_allow_pubkey(&s).unwrap());
-        let authority = authority
-            .as_ref()
-            .map_or_else(|| payer.as_ref(), |authority| authority.as_ref());
+        ps!(authority, @fb payer.as_ref(), @sm args.send_mode);
+
         let beneficiary = beneficiary.map_or_else(
             || authority.pubkey(),
             |b| PubkeySrc::parse(&b).unwrap().pubkey(),
