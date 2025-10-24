@@ -6,7 +6,7 @@ use sanctum_solana_cli_utils::{PubkeySrc, TxSendMode};
 use spl_stake_pool_interface::StakePool;
 
 use crate::{
-    parse_signer_allow_pubkey, parse_signer_pubkey_none,
+    parse_signer_allow_pubkey, parse_signer_fallback_payer,
     pool_config::{ConfigRaw, SyncPoolConfig},
     tx_utils::{handle_tx_full, with_auto_cb_ixs},
 };
@@ -56,17 +56,13 @@ impl SyncPoolArgs {
         let stake_pool: StakePool =
             StakePool::deserialize(&mut fetched_pool.data.as_slice()).unwrap();
 
-        let curr_manager = old_manager
-            .as_ref()
-            .map_or_else(|| None, |s| parse_signer_pubkey_none(s).unwrap());
-        let curr_manager = curr_manager
-            .as_ref()
-            .map_or_else(|| payer.as_ref(), |c| c.as_ref());
-        if curr_manager.pubkey() != stake_pool.manager {
+        parse_signer_fallback_payer!(old_manager, payer);
+
+        if old_manager.pubkey() != stake_pool.manager {
             panic!(
                 "Wrong manager. Expecting {}, got {}",
                 stake_pool.manager,
-                curr_manager.pubkey()
+                old_manager.pubkey()
             );
         }
         // allow pubkey signers to work with multisig programs
@@ -74,10 +70,10 @@ impl SyncPoolArgs {
             .as_ref()
             .map(|s| parse_signer_allow_pubkey(s).unwrap());
         let new_manager = new_manager.as_ref().map_or_else(
-            || curr_manager,
+            || old_manager,
             |nm| {
-                if nm.pubkey() == curr_manager.pubkey() {
-                    curr_manager
+                if nm.pubkey() == old_manager.pubkey() {
+                    old_manager
                 } else {
                     nm.as_ref()
                 }
@@ -119,7 +115,7 @@ impl SyncPoolArgs {
             program_id,
             pool,
             payer: payer.as_ref(),
-            manager: curr_manager,
+            manager: old_manager,
             new_manager,
             staker,
             manager_fee_account,

@@ -11,7 +11,7 @@ use solana_sdk::{clock::Clock, pubkey::Pubkey, rent::Rent, stake::state::StakeSt
 use spl_stake_pool_interface::{StakePool, ValidatorList, ValidatorStakeInfo};
 
 use crate::{
-    handle_tx_full, is_delegation_scheme_valid, parse_signer_pubkey_none, with_auto_cb_ixs,
+    handle_tx_full, is_delegation_scheme_valid, parse_signer_fallback_payer, with_auto_cb_ixs,
     SyncDelegationConfig, SyncDelegationConfigToml, ValidatorDelegation, ValidatorDelegationTarget,
     MAX_INCREASE_VALIDATOR_STAKE_IX_PER_TX,
 };
@@ -63,12 +63,7 @@ impl SyncDelegationArgs {
 
         let pool = PubkeySrc::parse(&pool).unwrap().pubkey();
 
-        let staker = staker
-            .as_ref()
-            .map_or_else(|| None, |s| parse_signer_pubkey_none(s).unwrap());
-        let staker = staker
-            .as_ref()
-            .map_or_else(|| payer.as_ref(), |s| s.as_ref());
+        parse_signer_fallback_payer!(staker, payer);
 
         let mut fetched = rpc
             .get_multiple_accounts(&[pool, sysvar::clock::ID, sysvar::rent::ID])

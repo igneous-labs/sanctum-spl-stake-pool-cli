@@ -16,7 +16,7 @@ use solana_sdk::{
 use spl_stake_pool_interface::{StakePool, ValidatorList};
 
 use crate::{
-    next_epoch_stake_and_transient_status, parse_signer_pubkey_none,
+    next_epoch_stake_and_transient_status, parse_signer_fallback_payer,
     pool_config::ConfigRaw,
     tx_utils::{handle_tx_full, with_auto_cb_ixs},
     SyncDelegationConfig,
@@ -59,10 +59,7 @@ impl IncreaseValidatorStakeArgs {
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();
 
-        let staker = staker.map_or_else(|| None, |s| parse_signer_pubkey_none(&s).unwrap());
-        let staker = staker
-            .as_ref()
-            .map_or_else(|| payer.as_ref(), |s| s.as_ref());
+        parse_signer_fallback_payer!(staker, payer);
 
         let pool = PubkeySrc::parse(pool.as_ref().unwrap()).unwrap().pubkey();
 

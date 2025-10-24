@@ -5,7 +5,7 @@ use clap::Args;
 use sanctum_solana_cli_utils::{PubkeySrc, TxSendMode};
 use spl_stake_pool_interface::{set_staker_ix_with_program_id, SetStakerKeys, StakePool};
 
-use crate::{handle_tx_full, parse_signer_pubkey_none, with_auto_cb_ixs, ConfigRaw, Subcmd};
+use crate::{handle_tx_full, parse_signer_fallback_payer, with_auto_cb_ixs, ConfigRaw, Subcmd};
 
 #[derive(Args, Debug)]
 #[command(long_about = "(Staker only) set a new staker from a pool config file")]
@@ -33,12 +33,7 @@ impl SetStakerArgs {
 
         let pool = PubkeySrc::parse(pool.as_ref().unwrap()).unwrap().pubkey();
 
-        let curr_staker = old_staker
-            .as_ref()
-            .map_or_else(|| None, |s| parse_signer_pubkey_none(s).unwrap());
-        let curr_staker = curr_staker
-            .as_ref()
-            .map_or_else(|| payer.as_ref(), |c| c.as_ref());
+        parse_signer_fallback_payer!(old_staker, payer);
 
         let new_staker = staker.map_or_else(
             || payer.pubkey(),
@@ -46,7 +41,7 @@ impl SetStakerArgs {
             |s| PubkeySrc::parse(&s).unwrap().pubkey(),
         );
 
-        if curr_staker.pubkey() == new_staker {
+        if old_staker.pubkey() == new_staker {
             eprintln!("Curr staker already {new_staker}, no changes necessary");
             return;
         }
@@ -56,11 +51,11 @@ impl SetStakerArgs {
         let stake_pool: StakePool =
             StakePool::deserialize(&mut fetched_pool.data.as_slice()).unwrap();
 
-        if curr_staker.pubkey() != stake_pool.staker {
+        if old_staker.pubkey() != stake_pool.staker {
             panic!(
                 "Wrong staker. Expecting {}, got {}",
                 stake_pool.staker,
-                curr_staker.pubkey()
+                old_staker.pubkey()
             );
         }
 
@@ -68,7 +63,7 @@ impl SetStakerArgs {
             program_id,
             SetStakerKeys {
                 stake_pool: pool,
-                signer: curr_staker.pubkey(),
+                signer: old_staker.pubkey(),
                 new_staker,
             },
         )
@@ -82,7 +77,7 @@ impl SetStakerArgs {
             args.send_mode,
             &ixs,
             &[],
-            &mut [payer.as_ref(), curr_staker],
+            &mut [payer.as_ref(), old_staker],
         )
         .await;
     }
