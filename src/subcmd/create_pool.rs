@@ -20,11 +20,11 @@ use spl_token_2022::{extension::StateWithExtensions, state::Mint};
 
 use crate::{
     parse::filter_default_stake_deposit_auth,
-    parse_signer_pubkey_none,
     pool_config::{
         print_adding_validators_msg, ConfigRaw, CreateConfig, SyncPoolConfig,
         SyncValidatorListConfig,
     },
+    ps,
     subcmd::Subcmd,
     tx_utils::{handle_tx_full, with_auto_cb_ixs, MAX_ADD_VALIDATORS_IX_PER_TX},
 };
@@ -80,21 +80,13 @@ impl CreatePoolArgs {
             pool.as_ref(),
             validator_list.as_ref(),
             reserve.as_ref().map(|r| &r.address),
-        ]
-        .map(|p| {
-            parse_signer_pubkey_none(p.unwrap())
-                .unwrap()
-                .expect("pool, validator_list and reserve must be signers, not pubkeys")
-        });
-        let manager = manager.map(|m| {
-            parse_signer_pubkey_none(&m)
-                .unwrap()
-                .expect("Manager must be signer, not pubkey")
-        });
-        let manager = manager
-            .as_ref()
-            .map(|m| m.as_ref())
-            .unwrap_or(payer.as_ref());
+        ];
+        ps!(pool, @sm args.send_mode);
+        ps!(validator_list, @sm args.send_mode);
+        ps!(reserve, @sm args.send_mode);
+
+        ps!(manager, @fb payer.as_ref(), @sm args.send_mode);
+
         let mint = PubkeySrc::parse(&mint.unwrap()).unwrap().pubkey();
 
         let max_validators = max_validators.unwrap();

@@ -15,8 +15,8 @@ use solana_sdk::{
 use spl_stake_pool_interface::{StakePool, ValidatorList};
 
 use crate::{
-    next_epoch_stake_and_transient_status, parse_signer_pubkey_none, pool_config::ConfigRaw,
-    tx_utils::handle_tx_full, with_auto_cb_ixs, SyncDelegationConfig,
+    next_epoch_stake_and_transient_status, pool_config::ConfigRaw, ps, tx_utils::handle_tx_full,
+    with_auto_cb_ixs, SyncDelegationConfig,
 };
 
 use super::Subcmd;
@@ -56,10 +56,7 @@ impl DecreaseValidatorStakeArgs {
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();
 
-        let staker = staker.map_or_else(|| None, |s| parse_signer_pubkey_none(&s).unwrap());
-        let staker = staker
-            .as_ref()
-            .map_or_else(|| payer.as_ref(), |s| s.as_ref());
+        ps!(staker, @fb payer.as_ref(), @sm args.send_mode);
 
         let pool = PubkeySrc::parse(pool.as_ref().unwrap()).unwrap().pubkey();
 
