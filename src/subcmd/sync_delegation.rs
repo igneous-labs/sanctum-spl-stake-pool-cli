@@ -7,7 +7,13 @@ use sanctum_solana_cli_utils::{PubkeySrc, TxSendMode};
 use sanctum_spl_stake_pool_lib::{
     FindTransientStakeAccount, FindTransientStakeAccountArgs, FindValidatorStakeAccount,
 };
-use solana_sdk::{clock::Clock, pubkey::Pubkey, rent::Rent, stake::state::StakeStateV2, sysvar};
+use solana_sdk::{
+    clock::Clock,
+    pubkey::Pubkey,
+    rent::Rent,
+    stake::{self, state::StakeStateV2},
+    sysvar,
+};
 use spl_stake_pool_interface::{StakePool, ValidatorList, ValidatorStakeInfo};
 
 use crate::{
@@ -142,8 +148,11 @@ impl SyncDelegationArgs {
             .chunks(2)
             .map(|a| {
                 (
+                    // vsa should always exist
                     StakeStateV2::deserialize(&mut a[0].as_ref().unwrap().data.as_slice()).unwrap(),
+                    // tsa might be in all kinds of states
                     a[1].as_ref()
+                        .filter(|a| a.owner == stake::program::ID) // donation mightve happened after merging
                         .map(|a| StakeStateV2::deserialize(&mut a.data.as_slice()).unwrap()),
                 )
             })
