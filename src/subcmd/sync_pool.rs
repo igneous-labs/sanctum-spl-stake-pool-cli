@@ -16,7 +16,10 @@ use super::Subcmd;
 #[derive(Args, Debug)]
 #[command(long_about = "(Manager only) sync stake pool settings with a pool config file")]
 pub struct SyncPoolArgs {
-    #[arg(help = "Path to pool config file to update the stake pool's settings to")]
+    #[arg(
+        help = r#"Path to pool config file to update the stake pool's settings to.
+Make sure to set `old-manager` field in toml for a non-wallet current pool manager signer."#
+    )]
     pub pool_config: PathBuf,
 }
 
