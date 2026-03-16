@@ -14,17 +14,24 @@ use solana_sdk::{
 use spl_associated_token_account_interface::CreateIdempotentKeys;
 use spl_stake_pool_interface::{StakePool, ValidatorList};
 
-use crate::{handle_tx_full, update_pool, with_auto_cb_ixs, Subcmd, UpdateCtrl, UpdatePoolArgs};
+use crate::{
+    handle_tx_full, ps, update_pool, with_auto_cb_ixs, Subcmd, UpdateCtrl, UpdatePoolArgs,
+};
 
 #[derive(Args, Debug)]
-#[command(
-    long_about = "Deposits (unwrapped) SOL from the payer wallet into a stake pool, minting the LST in return"
-)]
+#[command(long_about = "Deposits (unwrapped) SOL into a stake pool, minting the LST in return")]
 pub struct DepositSolArgs {
     #[arg(
         long,
         short,
-        help = "Token account to receive the minted pool tokens. Defaults to authority's ATA, optionally creating it, if not set."
+        help = "SOL account to deposit SOL from. Defaults to config wallet if not set."
+    )]
+    pub from: Option<String>,
+
+    #[arg(
+        long,
+        short,
+        help = "Token account to receive the minted pool tokens. Defaults to `from`'s ATA, optionally creating it, if not set."
     )]
     pub mint_to: Option<String>,
 
@@ -42,13 +49,19 @@ pub struct DepositSolArgs {
 
 impl DepositSolArgs {
     pub async fn run(args: crate::Args) {
-        let Self { mint_to, pool, sol } = match args.subcmd {
+        let Self {
+            from,
+            mint_to,
+            pool,
+            sol,
+        } = match args.subcmd {
             Subcmd::DepositSol(a) => a,
             _ => unreachable!(),
         };
 
         let rpc = args.config.nonblocking_rpc_client();
         let payer = args.config.signer();
+        ps!(from, @fb payer.as_ref(), @sm args.send_mode);
 
         let pool = PubkeySrc::parse(&pool).unwrap().pubkey();
 
@@ -62,7 +75,7 @@ impl DepositSolArgs {
                 .unwrap();
 
         let (authority_ata, _bump) = FindAtaAddressArgs {
-            wallet: payer.pubkey(),
+            wallet: from.pubkey(),
             mint: decoded_pool.pool_mint,
             token_program: decoded_pool.token_program,
         }
@@ -118,7 +131,7 @@ impl DepositSolArgs {
                         CreateIdempotentKeys {
                             funding_account: payer.pubkey(),
                             associated_token_account: mint_to,
-                            wallet: payer.pubkey(),
+                            wallet: from.pubkey(),
                             mint: decoded_pool.pool_mint,
                             system_program: system_program::ID,
                             token_program: decoded_pool.token_program,
@@ -150,9 +163,9 @@ impl DepositSolArgs {
                 is_writable: true,
             },
             AccountMeta {
-                pubkey: payer.pubkey(),
+                pubkey: from.pubkey(),
                 is_signer: true,
-                is_writable: false,
+                is_writable: true,
             },
             AccountMeta {
                 pubkey: mint_to,
@@ -205,7 +218,7 @@ impl DepositSolArgs {
             TxSendMode::DumpMsg => ixs,
             _ => with_auto_cb_ixs(&rpc, &payer.pubkey(), ixs, &[], args.fee_limit_cb).await,
         };
-        let mut signers = [payer.as_ref()];
+        let mut signers = [payer.as_ref(), from];
         handle_tx_full(&rpc, args.send_mode, &ixs, &[], &mut signers).await;
     }
 }
