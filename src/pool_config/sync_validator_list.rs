@@ -1,9 +1,9 @@
 use std::{collections::HashSet, fmt::Display, iter::Flatten, num::NonZeroU32};
 
 use sanctum_spl_stake_pool_lib::{
-    lamports_for_new_vsa, FindEphemeralStakeAccount, FindEphemeralStakeAccountArgs,
-    FindTransientStakeAccount, FindTransientStakeAccountArgs, FindValidatorStakeAccount,
-    FindValidatorStakeAccountArgs, FindWithdrawAuthority,
+    FindEphemeralStakeAccount, FindEphemeralStakeAccountArgs, FindTransientStakeAccount,
+    FindTransientStakeAccountArgs, FindValidatorStakeAccount, FindValidatorStakeAccountArgs,
+    FindWithdrawAuthority,
 };
 use solana_sdk::{
     instruction::Instruction,
@@ -23,7 +23,7 @@ use spl_stake_pool_interface::{
     SetPreferredValidatorKeys, StakePool, StakeStatus, ValidatorStakeInfo,
 };
 
-use crate::pool_config::utils::pubkey_opt_display;
+use crate::pool_config::utils::{lamports_for_new_vsa, pubkey_opt_display};
 
 /// All generated ixs must be signed by staker only.
 /// Adds and removes validators from the list to match `self.validators`
