@@ -1,7 +1,7 @@
 use borsh::BorshSerialize;
 use sanctum_spl_stake_pool_lib::{
     account_resolvers::{Initialize, InitializeWithDepositAuthArgs},
-    lamports_for_new_vsa, min_reserve_lamports, FindWithdrawAuthority, STAKE_POOL_SIZE,
+    min_reserve_lamports, FindWithdrawAuthority, STAKE_POOL_SIZE,
 };
 use solana_readonly_account::{keyed::Keyed, ReadonlyAccountData, ReadonlyAccountOwner};
 use solana_sdk::{
@@ -22,6 +22,8 @@ use spl_stake_pool_interface::{
 use spl_token_interface::{
     set_authority_ix_with_program_id, AuthorityType, SetAuthorityIxArgs, SetAuthorityKeys,
 };
+
+use crate::pool_config::utils::lamports_for_new_vsa;
 
 #[derive(Debug)]
 pub struct CreateConfig<'a, T> {

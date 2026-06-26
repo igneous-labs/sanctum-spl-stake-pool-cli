@@ -2,9 +2,9 @@ use std::cmp::Ordering;
 
 use sanctum_solana_cli_utils::TokenAmt;
 use sanctum_spl_stake_pool_lib::{
-    lamports_for_new_vsa, FindEphemeralStakeAccount, FindEphemeralStakeAccountArgs,
-    FindTransientStakeAccount, FindTransientStakeAccountArgs, FindValidatorStakeAccount,
-    FindWithdrawAuthority, MIN_ACTIVE_STAKE,
+    FindEphemeralStakeAccount, FindEphemeralStakeAccountArgs, FindTransientStakeAccount,
+    FindTransientStakeAccountArgs, FindValidatorStakeAccount, FindWithdrawAuthority,
+    MIN_ACTIVE_STAKE,
 };
 use solana_sdk::{
     instruction::Instruction,
@@ -21,6 +21,8 @@ use spl_stake_pool_interface::{
     IncreaseAdditionalValidatorStakeIxArgs, IncreaseAdditionalValidatorStakeKeys, StakeStatus,
     ValidatorStakeInfo,
 };
+
+use crate::pool_config::utils::lamports_for_new_vsa;
 
 /// All generated ixs must be signed by staker only.
 #[derive(Debug)]
