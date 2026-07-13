@@ -22,7 +22,7 @@ use spl_stake_pool_interface::{
     ValidatorStakeInfo,
 };
 
-use crate::pool_config::utils::lamports_for_new_vsa;
+use crate::pool_config::utils::{lamports_for_new_vsa, stake_acc_rent};
 
 /// All generated ixs must be signed by staker only.
 #[derive(Debug)]
@@ -248,12 +248,11 @@ impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> Iterator for DelegationChan
                     // Need to leave at least MIN_ACTIVE_STAKE in VSA else instruction fails with InsufficientFunds
                     let decrease_stake_amt =
                         (next_epoch_stake - desired).saturating_sub(MIN_ACTIVE_STAKE);
-                    let sa_rent_lamports = lamports_for_new_vsa(&self.rent);
-                    let min_tsa_balance = MIN_ACTIVE_STAKE + sa_rent_lamports;
+                    let min_tsa_balance = lamports_for_new_vsa(&self.rent);
                     ValidatorDelegationChange {
                         vote: vsi.vote_account_address,
                         transient_seed_suffix: vsi.transient_seed_suffix,
-                        ty: if self.reserve_lamports < 2 * sa_rent_lamports {
+                        ty: if self.reserve_lamports < 2 * stake_acc_rent(&self.rent) {
                             // thanks to require split stake to be rent-exempt,
                             // reserve needs to fund the ephemeral and transient stake accounts
                             ValidatorDelegationChangeTy::InsufficientReserveLamports
@@ -266,7 +265,7 @@ impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> Iterator for DelegationChan
                         } else {
                             if let TransientStakeAccStatus::None = tsa_status {
                                 // rent for tsa
-                                self.reserve_lamports -= sa_rent_lamports;
+                                self.reserve_lamports -= stake_acc_rent(&self.rent);
                             }
                             ValidatorDelegationChangeTy::DecreaseStake(decrease_stake_amt)
                         },
@@ -285,10 +284,10 @@ impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> Iterator for DelegationChan
             }),
             Ordering::Less => Some(match tsa_status {
                 TransientStakeAccStatus::Activating | TransientStakeAccStatus::None => {
-                    let sa_rent_lamports = lamports_for_new_vsa(&self.rent);
                     // https://github.com/solana-labs/solana-program-library/blob/d4b7fc06233b11efecc082cd2f6ee3eadd5daa04/stake-pool/program/src/processor.rs#L1635-L1643
-                    let available_stake =
-                        self.reserve_lamports.saturating_sub(2 * sa_rent_lamports);
+                    let available_stake = self
+                        .reserve_lamports
+                        .saturating_sub(2 * stake_acc_rent(&self.rent));
                     let desired_inc = desired - next_epoch_stake;
                     let actual_inc = std::cmp::min(available_stake, desired_inc);
                     ValidatorDelegationChange {
@@ -300,7 +299,7 @@ impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> Iterator for DelegationChan
                             self.reserve_lamports -= actual_inc;
                             if let TransientStakeAccStatus::None = tsa_status {
                                 // rent for tsa
-                                self.reserve_lamports -= sa_rent_lamports;
+                                self.reserve_lamports -= stake_acc_rent(&self.rent);
                             }
                             if actual_inc == desired_inc {
                                 ValidatorDelegationChangeTy::IncreaseStake(actual_inc)

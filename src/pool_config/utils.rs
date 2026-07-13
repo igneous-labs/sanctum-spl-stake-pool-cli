@@ -14,6 +14,9 @@ const fn min_delegation() -> u64 {
 ///
 /// Ported from sanctum-spl-stake-pool-lib due to change to min delegation
 pub fn lamports_for_new_vsa(rent: &Rent) -> u64 {
+    stake_acc_rent(rent).saturating_add(min_delegation())
+}
+
+pub fn stake_acc_rent(rent: &Rent) -> u64 {
     rent.minimum_balance(std::mem::size_of::<StakeStateV2>())
-        .saturating_add(min_delegation())
 }
