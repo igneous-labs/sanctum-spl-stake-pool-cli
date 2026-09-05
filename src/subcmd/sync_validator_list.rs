@@ -15,7 +15,8 @@ use crate::{
     },
     ps,
     tx_utils::{
-        handle_tx_full, with_auto_cb_ixs, MAX_ADD_VALIDATORS_IX_PER_TX,
+        get_multiple_accounts_chunked, handle_tx_full, with_auto_cb_ixs,
+        MAX_ACCOUNTS_PER_GET_MULTIPLE_ACCOUNTS, MAX_ADD_VALIDATORS_IX_PER_TX,
         MAX_REMOVE_VALIDATOR_IXS_ENUM_PER_TX,
     },
     update::{update_pool, UpdatePoolArgs},
@@ -131,12 +132,14 @@ impl SyncValidatorListArgs {
                 .0
             })
             .collect();
-        let remove_vsas = rpc
-            .get_multiple_accounts(&remove_vsas)
-            .await
-            .unwrap()
-            .into_iter()
-            .map(|acc_opt| bincode::deserialize(&acc_opt.unwrap().data).unwrap());
+        let remove_vsas = get_multiple_accounts_chunked(
+            &rpc,
+            &remove_vsas,
+            MAX_ACCOUNTS_PER_GET_MULTIPLE_ACCOUNTS,
+        )
+        .await
+        .into_iter()
+        .map(|acc_opt| bincode::deserialize(&acc_opt.unwrap().data).unwrap());
 
         print_removing_validators_msg(remove.clone());
 

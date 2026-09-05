@@ -7,6 +7,7 @@ use sanctum_solana_client_utils::{
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
+    account::Account,
     address_lookup_table::AddressLookupTableAccount,
     compute_budget::ComputeBudgetInstruction,
     hash::Hash,
@@ -23,6 +24,24 @@ pub const MAX_ADD_VALIDATORS_IX_PER_TX: usize = 7;
 pub const MAX_REMOVE_VALIDATOR_IXS_ENUM_PER_TX: usize = 5;
 
 pub const MAX_INCREASE_VALIDATOR_STAKE_IX_PER_TX: usize = 3;
+
+/// getMultipleAccounts response size limits and many RPCs cap requests at this
+/// many accounts per call, so chunk requests into batches of this size
+pub const MAX_ACCOUNTS_PER_GET_MULTIPLE_ACCOUNTS: usize = 100;
+
+/// Fetch all `pks` via getMultipleAccounts, chunking the requests to stay
+/// under RPC per-request account limits. Preserves the order of `pks`.
+pub async fn get_multiple_accounts_chunked(
+    rpc: &RpcClient,
+    pks: &[Pubkey],
+    chunk_size: usize,
+) -> Vec<Option<Account>> {
+    let mut accounts = Vec::with_capacity(pks.len());
+    for chunk in pks.chunks(chunk_size) {
+        accounts.extend(rpc.get_multiple_accounts(chunk).await.unwrap());
+    }
+    accounts
+}
 
 const CU_BUFFER_RATIO: f64 = 1.1;
 

@@ -17,8 +17,9 @@ use solana_sdk::{
 use spl_stake_pool_interface::{StakePool, ValidatorList, ValidatorStakeInfo};
 
 use crate::{
-    handle_tx_full, is_delegation_scheme_valid, ps, with_auto_cb_ixs, SyncDelegationConfig,
-    SyncDelegationConfigToml, ValidatorDelegation, ValidatorDelegationTarget,
+    get_multiple_accounts_chunked, handle_tx_full, is_delegation_scheme_valid, ps,
+    with_auto_cb_ixs, SyncDelegationConfig, SyncDelegationConfigToml, ValidatorDelegation,
+    ValidatorDelegationTarget, MAX_ACCOUNTS_PER_GET_MULTIPLE_ACCOUNTS,
     MAX_INCREASE_VALIDATOR_STAKE_IX_PER_TX,
 };
 
@@ -138,7 +139,12 @@ impl SyncDelegationArgs {
                 },
             )
             .collect();
-        let fetched = rpc.get_multiple_accounts(&stake_accs).await.unwrap();
+        let fetched = get_multiple_accounts_chunked(
+            &rpc,
+            &stake_accs,
+            MAX_ACCOUNTS_PER_GET_MULTIPLE_ACCOUNTS,
+        )
+        .await;
         let fetched_stake_accs: Vec<(StakeStateV2, Option<StakeStateV2>)> = fetched
             .chunks(2)
             .map(|a| {
