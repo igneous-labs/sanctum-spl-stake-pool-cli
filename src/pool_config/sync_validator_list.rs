@@ -23,7 +23,7 @@ use spl_stake_pool_interface::{
     SetPreferredValidatorKeys, StakePool, StakeStatus, ValidatorStakeInfo,
 };
 
-use crate::pool_config::utils::{lamports_for_new_vsa, pubkey_opt_display};
+use crate::pool_config::utils::{min_delegation, pubkey_opt_display};
 
 /// All generated ixs must be signed by staker only.
 /// Adds and removes validators from the list to match `self.validators`
@@ -207,7 +207,6 @@ impl SyncValidatorListConfig<'_> {
     fn remove_validator_ixs(
         &self,
         ValidatorStakeInfo {
-            active_stake_lamports,
             transient_seed_suffix,
             validator_seed_suffix,
             vote_account_address,
@@ -244,13 +243,13 @@ impl SyncValidatorListConfig<'_> {
                 stake_program: stake::program::ID,
             },
         )?;
-        let lamports_to_decrease =
-            active_stake_lamports.saturating_sub(lamports_for_new_vsa(self.rent));
-        let is_vsa_active = match vsa {
-            StakeStateV2::Stake(_meta, stake, _flags) => {
-                stake.delegation.deactivation_epoch == u64::MAX
+        let (lamports_to_decrease, is_vsa_active) = match vsa {
+            StakeStateV2::Stake(_meta, stake, _flags)
+                if stake.delegation.deactivation_epoch == u64::MAX =>
+            {
+                (stake.delegation.stake - min_delegation(), true)
             }
-            _ => false,
+            _ => (0, false),
         };
         Ok(if lamports_to_decrease > 0 && is_vsa_active {
             let ephemeral_stake_seed = 0;
