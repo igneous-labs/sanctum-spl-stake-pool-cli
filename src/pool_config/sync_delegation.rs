@@ -4,7 +4,6 @@ use sanctum_solana_cli_utils::TokenAmt;
 use sanctum_spl_stake_pool_lib::{
     FindEphemeralStakeAccount, FindEphemeralStakeAccountArgs, FindTransientStakeAccount,
     FindTransientStakeAccountArgs, FindValidatorStakeAccount, FindWithdrawAuthority,
-    MIN_ACTIVE_STAKE,
 };
 use solana_sdk::{
     instruction::Instruction,
@@ -22,7 +21,7 @@ use spl_stake_pool_interface::{
     ValidatorStakeInfo,
 };
 
-use crate::pool_config::utils::{lamports_for_new_vsa, stake_acc_rent};
+use crate::pool_config::utils::{lamports_for_new_vsa, min_delegation, stake_acc_rent};
 
 /// All generated ixs must be signed by staker only.
 #[derive(Debug)]
@@ -245,9 +244,9 @@ impl<'a, D: Iterator<Item = ValidatorChangeSrc<'a>>> Iterator for DelegationChan
             Ordering::Greater => Some(match tsa_status {
                 TransientStakeAccStatus::Deactivating | TransientStakeAccStatus::None => {
                     // spl stake pool program requirement:
-                    // Need to leave at least MIN_ACTIVE_STAKE in VSA else instruction fails with InsufficientFunds
+                    // Need to leave at least min_delegation() in VSA else instruction fails with InsufficientFunds
                     let decrease_stake_amt =
-                        (next_epoch_stake - desired).saturating_sub(MIN_ACTIVE_STAKE);
+                        (next_epoch_stake - desired).saturating_sub(min_delegation());
                     let min_tsa_balance = lamports_for_new_vsa(&self.rent);
                     ValidatorDelegationChange {
                         vote: vsi.vote_account_address,

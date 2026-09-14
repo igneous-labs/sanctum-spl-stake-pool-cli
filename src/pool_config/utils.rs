@@ -5,7 +5,7 @@ pub fn pubkey_opt_display(pubkey_opt: &Option<Pubkey>) -> String {
 }
 
 /// Ported from sanctum-spl-stake-pool-lib due to change to min delegation
-const fn min_delegation() -> u64 {
+pub const fn min_delegation() -> u64 {
     1_000_000_000
 }
 
