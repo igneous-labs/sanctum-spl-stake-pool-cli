@@ -54,11 +54,7 @@ impl<'a, T: ReadonlyAccountOwner + ReadonlyAccountData> CreateConfig<'a, T> {
         let create_reserve_ix = system_instruction::create_account(
             &self.payer.pubkey(),
             &self.reserve.pubkey(),
-            min_reserve_lamports(self.rent).saturating_add(
-                u64::try_from(self.starting_validators)
-                    .unwrap()
-                    .saturating_mul(lamports_for_new_vsa(self.rent)),
-            ),
+            min_reserve_lamports(self.rent),
             std::mem::size_of::<StakeStateV2>().try_into().unwrap(),
             &stake::program::ID,
         );
