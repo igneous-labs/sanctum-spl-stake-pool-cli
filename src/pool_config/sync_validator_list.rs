@@ -23,7 +23,7 @@ use spl_stake_pool_interface::{
     SetPreferredValidatorKeys, StakePool, StakeStatus, ValidatorStakeInfo,
 };
 
-use crate::pool_config::utils::{min_delegation, pubkey_opt_display};
+use crate::pool_config::utils::{min_delegation, pubkey_opt_display, stake_acc_rent};
 
 /// All generated ixs must be signed by staker only.
 /// Adds and removes validators from the list to match `self.validators`
@@ -196,11 +196,23 @@ impl SyncValidatorListConfig<'_> {
         &self,
         remove: impl Iterator<Item = (&'b ValidatorStakeInfo, StakeStateV2)>,
     ) -> std::io::Result<Vec<Instruction>> {
-        let mut res = vec![];
-        for (vsi, vsa) in remove {
-            res.extend(self.remove_validator_ixs(vsi, vsa)?.into_iter())
-        }
-        Ok(res)
+        Ok(self
+            .remove_validators_ixs_enum(remove)?
+            .into_iter()
+            .flatten()
+            .collect())
+    }
+
+    /// Like [`Self::remove_validators_ixs`] but keeps each validator's
+    /// instruction group together so callers can calculate the reserve
+    /// lamports required by each group.
+    pub fn remove_validators_ixs_enum<'b>(
+        &self,
+        remove: impl Iterator<Item = (&'b ValidatorStakeInfo, StakeStateV2)>,
+    ) -> std::io::Result<Vec<RemoveValidatorIxs>> {
+        remove
+            .map(|(vsi, vsa)| self.remove_validator_ixs(vsi, vsa))
+            .collect()
     }
 
     /// Assumes vsi has been updated for this epoch
@@ -291,10 +303,21 @@ impl SyncValidatorListConfig<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum RemoveValidatorIxs {
     WithDecreaseStake(Instruction, Instruction),
     RemoveDirectly(Instruction),
+}
+
+impl RemoveValidatorIxs {
+    /// Lamports required in the reserve to create the ephemeral and transient
+    /// stake accounts needed by this validator removal, if any.
+    pub fn reserve_rent_lamports(&self, rent: &Rent) -> u64 {
+        match self {
+            Self::WithDecreaseStake(_, _) => 2 * stake_acc_rent(rent),
+            Self::RemoveDirectly(_) => 0,
+        }
+    }
 }
 
 impl IntoIterator for RemoveValidatorIxs {
