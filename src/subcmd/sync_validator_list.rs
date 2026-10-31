@@ -2,16 +2,20 @@ use std::{num::NonZeroU32, path::PathBuf, str::FromStr};
 
 use borsh::BorshDeserialize;
 use clap::Args;
-use sanctum_solana_cli_utils::{PubkeySrc, TxSendMode};
+use sanctum_associated_token_lib::FindAtaAddressArgs;
+use sanctum_solana_cli_utils::{PubkeySrc, TokenAmt, TxSendMode};
 use sanctum_spl_stake_pool_lib::{FindValidatorStakeAccount, FindValidatorStakeAccountArgs};
 use solana_readonly_account::keyed::Keyed;
-use solana_sdk::{clock::Clock, pubkey::Pubkey, rent::Rent, sysvar};
+use solana_sdk::{
+    clock::Clock, instruction::Instruction, pubkey::Pubkey, rent::Rent, system_program, sysvar,
+};
+use spl_associated_token_account_interface::CreateIdempotentKeys;
 use spl_stake_pool_interface::{StakePool, ValidatorList};
 
 use crate::{
     pool_config::{
-        print_adding_validators_msg, print_removing_validators_msg, ConfigRaw,
-        SyncValidatorListConfig,
+        print_adding_validators_msg, print_removing_validators_msg, utils::lamports_for_new_vsa,
+        ConfigRaw, SyncValidatorListConfig,
     },
     ps,
     tx_utils::{
@@ -23,13 +27,20 @@ use crate::{
     UpdateCtrl,
 };
 
-use super::Subcmd;
+use super::{deposit_sol_ix, Subcmd};
 
 #[derive(Args, Debug)]
 #[command(
     long_about = "(Staker only) sync validator list entries and preferred validators with a pool config file"
 )]
 pub struct SyncValidatorListArgs {
+    #[arg(
+        short,
+        long,
+        help = "Prepend a DepositSol instruction to each add/remove validator transaction, funding the lamports required to be transferred from the pool's reserve to create the stake accounts (VSA/TSA/ephemeral) for that transaction. Deposits from the config payer and mints LSTs to the payer's associated token account."
+    )]
+    pub deposit_sol_for_rent: bool,
+
     #[arg(
         help = "Path to pool config file containing the updated validator list and preferred validators to update the pool to"
     )]
@@ -38,7 +49,10 @@ pub struct SyncValidatorListArgs {
 
 impl SyncValidatorListArgs {
     pub async fn run(args: crate::Args) {
-        let Self { pool_config } = match args.subcmd {
+        let Self {
+            pool_config,
+            deposit_sol_for_rent,
+        } = match args.subcmd {
             Subcmd::SyncValidatorList(a) => a,
             _ => unreachable!(),
         };
@@ -117,6 +131,75 @@ impl SyncValidatorListArgs {
             rent: &rent,
         };
 
+        let deposit_sol_for_rent = if deposit_sol_for_rent {
+            let from = payer.pubkey();
+            if let Some(sol_deposit_authority) = stake_pool.sol_deposit_authority {
+                if sol_deposit_authority != payer.pubkey()
+                    && sol_deposit_authority != staker.pubkey()
+                {
+                    panic!(
+                        "Pool requires SOL deposit authority {sol_deposit_authority} to sign, but it is neither the payer nor staker"
+                    );
+                }
+            }
+            let (mint_to, _bump) = FindAtaAddressArgs {
+                wallet: from,
+                mint: stake_pool.pool_mint,
+                token_program: stake_pool.token_program,
+            }
+            .find_ata_address();
+            let create_ata_ix = if rpc.get_account(&mint_to).await.is_ok() {
+                None
+            } else {
+                eprintln!("Will create ATA {mint_to} to receive minted LSTs");
+                Some(
+                    spl_associated_token_account_interface::create_idempotent_ix(
+                        CreateIdempotentKeys {
+                            funding_account: payer.pubkey(),
+                            associated_token_account: mint_to,
+                            wallet: from,
+                            mint: stake_pool.pool_mint,
+                            system_program: system_program::ID,
+                            token_program: stake_pool.token_program,
+                        },
+                    )
+                    .unwrap(),
+                )
+            };
+            Some((from, mint_to, create_ata_ix))
+        } else {
+            None
+        };
+
+        let prefund_ixs = |lamports: u64| -> Vec<Instruction> {
+            let Some((from, mint_to, create_ata_ix)) = &deposit_sol_for_rent else {
+                return vec![];
+            };
+            if lamports == 0 {
+                return vec![];
+            }
+            eprintln!(
+                "Prepending deposit of {} SOL to fund stake account rent",
+                TokenAmt {
+                    amt: lamports,
+                    decimals: 9
+                }
+            );
+            let mut ixs = Vec::with_capacity(2);
+            if let Some(create_ata_ix) = create_ata_ix {
+                ixs.push(create_ata_ix.clone());
+            }
+            ixs.push(deposit_sol_ix(
+                program_id,
+                pool,
+                &stake_pool,
+                *from,
+                *mint_to,
+                lamports,
+            ));
+            ixs
+        };
+
         let (add, remove) = svlc.add_remove_changeset(&old_validators);
         // need to additionally fetch VSAs of validators to remove to make sure they weren't
         // already DeactivateDelinquent'd
@@ -144,22 +227,27 @@ impl SyncValidatorListArgs {
         print_removing_validators_msg(remove.clone());
 
         for remove_validator_ix_chunk in svlc
-            .remove_validators_ixs(remove.zip(remove_vsas))
+            .remove_validators_ixs_enum(remove.zip(remove_vsas))
             .unwrap()
             .as_slice()
             .chunks(MAX_REMOVE_VALIDATOR_IXS_ENUM_PER_TX)
         {
+            let reserve_lamports = remove_validator_ix_chunk
+                .iter()
+                .map(|remove_ixs| remove_ixs.reserve_rent_lamports(&rent))
+                .sum();
+            let mut remove_validator_ix_chunk: Vec<Instruction> = remove_validator_ix_chunk
+                .iter()
+                .cloned()
+                .flat_map(IntoIterator::into_iter)
+                .collect();
+            let mut prefund_ixs = prefund_ixs(reserve_lamports);
+            prefund_ixs.append(&mut remove_validator_ix_chunk);
             let remove_validator_ix_chunk = match args.send_mode {
-                TxSendMode::DumpMsg => Vec::from(remove_validator_ix_chunk),
+                TxSendMode::DumpMsg => prefund_ixs,
                 _ => {
-                    with_auto_cb_ixs(
-                        &rpc,
-                        &payer.pubkey(),
-                        Vec::from(remove_validator_ix_chunk),
-                        &[],
-                        args.fee_limit_cb,
-                    )
-                    .await
+                    with_auto_cb_ixs(&rpc, &payer.pubkey(), prefund_ixs, &[], args.fee_limit_cb)
+                        .await
                 }
             };
             handle_tx_full(
@@ -180,17 +268,16 @@ impl SyncValidatorListArgs {
             .as_slice()
             .chunks(MAX_ADD_VALIDATORS_IX_PER_TX)
         {
+            let reserve_lamports = u64::try_from(add_validator_ix_chunk.len())
+                .unwrap()
+                .saturating_mul(lamports_for_new_vsa(&rent));
+            let mut prefund_ixs = prefund_ixs(reserve_lamports);
+            prefund_ixs.extend_from_slice(add_validator_ix_chunk);
             let add_validator_ix_chunk = match args.send_mode {
-                TxSendMode::DumpMsg => Vec::from(add_validator_ix_chunk),
+                TxSendMode::DumpMsg => prefund_ixs,
                 _ => {
-                    with_auto_cb_ixs(
-                        &rpc,
-                        &payer.pubkey(),
-                        Vec::from(add_validator_ix_chunk),
-                        &[],
-                        args.fee_limit_cb,
-                    )
-                    .await
+                    with_auto_cb_ixs(&rpc, &payer.pubkey(), prefund_ixs, &[], args.fee_limit_cb)
+                        .await
                 }
             };
             handle_tx_full(

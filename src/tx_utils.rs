@@ -145,6 +145,8 @@ mod tests {
             Meta::default(),
             Stake {
                 delegation: Delegation {
+                    // keep enough stake to cover the 1 SOL min delegation
+                    stake: 11_000_000_000,
                     deactivation_epoch: u64::MAX,
                     ..Default::default()
                 },

@@ -9,6 +9,7 @@ use solana_readonly_account::keyed::Keyed;
 use solana_sdk::{
     clock::Clock,
     instruction::{AccountMeta, Instruction},
+    pubkey::Pubkey,
     system_program, sysvar,
 };
 use spl_associated_token_account_interface::CreateIdempotentKeys;
@@ -142,75 +143,14 @@ impl DepositSolArgs {
             }
         }
 
-        // manually craft deposit sol instruction here because i fukt up
-        // and wrote sanctum_spl_stake_pool_lib into unresolvable dependency hell
-        let mut data = vec![14];
-        data.extend_from_slice(&sol.amt.to_le_bytes());
-        let mut accounts = vec![
-            AccountMeta {
-                pubkey: pool,
-                is_signer: false,
-                is_writable: true,
-            },
-            AccountMeta {
-                pubkey: FindWithdrawAuthority { pool }.run_for_prog(&program_id).0,
-                is_signer: false,
-                is_writable: false,
-            },
-            AccountMeta {
-                pubkey: decoded_pool.reserve_stake,
-                is_signer: false,
-                is_writable: true,
-            },
-            AccountMeta {
-                pubkey: from.pubkey(),
-                is_signer: true,
-                is_writable: true,
-            },
-            AccountMeta {
-                pubkey: mint_to,
-                is_signer: false,
-                is_writable: true,
-            },
-            AccountMeta {
-                pubkey: decoded_pool.manager_fee_account,
-                is_signer: false,
-                is_writable: true,
-            },
-            // referrer
-            AccountMeta {
-                pubkey: mint_to,
-                is_signer: false,
-                is_writable: true,
-            },
-            AccountMeta {
-                pubkey: decoded_pool.pool_mint,
-                is_signer: false,
-                is_writable: true,
-            },
-            AccountMeta {
-                pubkey: system_program::ID,
-                is_signer: false,
-                is_writable: false,
-            },
-            AccountMeta {
-                pubkey: decoded_pool.token_program,
-                is_signer: false,
-                is_writable: false,
-            },
-        ];
-        if let Some(deposit_auth) = decoded_pool.sol_deposit_authority {
-            accounts.push(AccountMeta {
-                pubkey: deposit_auth,
-                is_signer: true,
-                is_writable: false,
-            });
-        }
-        ixs.push(Instruction {
+        ixs.push(deposit_sol_ix(
             program_id,
-            data,
-            accounts,
-        });
+            pool,
+            &decoded_pool,
+            from.pubkey(),
+            mint_to,
+            sol.amt,
+        ));
 
         // TODO: calc expected amount after fees
         eprintln!("Depositing {sol} SOL");
@@ -220,5 +160,84 @@ impl DepositSolArgs {
         };
         let mut signers = [payer.as_ref(), from];
         handle_tx_full(&rpc, args.send_mode, &ixs, &[], &mut signers).await;
+    }
+}
+
+/// Manually crafted deposit SOL instruction here because i fukt up
+// and wrote sanctum_spl_stake_pool_lib into unresolvable dependency hell
+pub fn deposit_sol_ix(
+    program_id: Pubkey,
+    pool: Pubkey,
+    decoded_pool: &StakePool,
+    from: Pubkey,
+    mint_to: Pubkey,
+    lamports: u64,
+) -> Instruction {
+    let mut data = vec![14];
+    data.extend_from_slice(&lamports.to_le_bytes());
+    let mut accounts = vec![
+        AccountMeta {
+            pubkey: pool,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: FindWithdrawAuthority { pool }.run_for_prog(&program_id).0,
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: decoded_pool.reserve_stake,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: from,
+            is_signer: true,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: mint_to,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: decoded_pool.manager_fee_account,
+            is_signer: false,
+            is_writable: true,
+        },
+        // referrer
+        AccountMeta {
+            pubkey: mint_to,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: decoded_pool.pool_mint,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: system_program::ID,
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: decoded_pool.token_program,
+            is_signer: false,
+            is_writable: false,
+        },
+    ];
+    if let Some(deposit_auth) = decoded_pool.sol_deposit_authority {
+        accounts.push(AccountMeta {
+            pubkey: deposit_auth,
+            is_signer: true,
+            is_writable: false,
+        });
+    }
+    Instruction {
+        program_id,
+        data,
+        accounts,
     }
 }
