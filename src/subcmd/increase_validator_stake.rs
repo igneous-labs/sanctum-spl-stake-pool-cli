@@ -10,6 +10,7 @@ use sanctum_spl_stake_pool_lib::{
     lamports_for_new_vsa, FindTransientStakeAccount, FindTransientStakeAccountArgs,
     FindValidatorStakeAccount,
 };
+use solana_readonly_account::keyed::Keyed;
 use solana_sdk::{
     clock::Clock, instruction::Instruction, rent::Rent, stake::state::StakeStateV2, sysvar,
 };
@@ -20,7 +21,7 @@ use crate::{
     pool_config::ConfigRaw,
     ps,
     tx_utils::{handle_tx_full, with_auto_cb_ixs},
-    SyncDelegationConfig,
+    update_pool, SyncDelegationConfig, UpdateCtrl, UpdatePoolArgs,
 };
 
 use super::Subcmd;
@@ -113,6 +114,25 @@ impl IncreaseValidatorStakeArgs {
             seed: vsi.transient_seed_suffix,
         })
         .run_for_prog(&program_id);
+
+        // IncreaseValidatorStake requires the pool and validator list to already be
+        // updated for the current epoch, so update first if stale.
+        update_pool(UpdatePoolArgs {
+            rpc: &rpc,
+            send_mode: args.send_mode,
+            payer: payer.as_ref(),
+            program_id,
+            current_epoch: curr_epoch,
+            stake_pool: Keyed {
+                pubkey: pool,
+                account: &stake_pool_acc,
+            },
+            validator_list_entries: &validators,
+            fee_limit_cb: args.fee_limit_cb,
+            ctrl: UpdateCtrl::IfNeeded,
+            no_merge: false,
+        })
+        .await;
 
         let fetched = rpc
             .get_multiple_accounts(&[vsa_pubkey, tsa_pubkey])
