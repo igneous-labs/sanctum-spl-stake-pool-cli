@@ -18,7 +18,8 @@ use super::Subcmd;
 pub struct SyncPoolArgs {
     #[arg(
         help = r#"Path to pool config file to update the stake pool's settings to.
-Make sure to set `old-manager` field in toml for a non-wallet current pool manager signer."#
+If `old-manager` is not set in the toml, it falls back to `manager`, then to the config wallet.
+Make sure to set `old-manager` field in toml for a non-wallet current pool manager signer that differs from `manager`."#
     )]
     pub pool_config: PathBuf,
 }
@@ -59,7 +60,13 @@ impl SyncPoolArgs {
         let stake_pool: StakePool =
             StakePool::deserialize(&mut fetched_pool.data.as_slice()).unwrap();
 
-        ps!(old_manager, @fb payer.as_ref(), @sm args.send_mode);
+        let new_manager = manager.clone();
+
+        // If `old-manager` isn't set, fall back to `manager` (the common case where the
+        // manager isn't being rotated) instead of blindly assuming the config wallet is
+        // the current pool manager.
+        ps!(manager, @fb payer.as_ref(), @sm args.send_mode);
+        ps!(old_manager, @fb manager, @sm args.send_mode);
 
         if old_manager.pubkey() != stake_pool.manager {
             panic!(
@@ -69,7 +76,6 @@ impl SyncPoolArgs {
             );
         }
 
-        let new_manager = manager;
         ps!(new_manager, @fb old_manager, @sm args.send_mode);
 
         let [manager_fee_account, staker] = [
