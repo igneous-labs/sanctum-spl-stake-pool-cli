@@ -33,7 +33,7 @@ impl SyncPoolArgs {
 
         let ConfigRaw {
             pool,
-            manager,
+            manager: new_manager,
             manager_fee_account,
             staker,
             stake_deposit_auth,
@@ -60,13 +60,8 @@ impl SyncPoolArgs {
         let stake_pool: StakePool =
             StakePool::deserialize(&mut fetched_pool.data.as_slice()).unwrap();
 
-        let new_manager = manager.clone();
-
-        // If `old-manager` isn't set, fall back to `manager` (the common case where the
-        // manager isn't being rotated) instead of blindly assuming the config wallet is
-        // the current pool manager.
-        ps!(manager, @fb payer.as_ref(), @sm args.send_mode);
-        ps!(old_manager, @fb manager, @sm args.send_mode);
+        ps!(new_manager, @fb payer.as_ref(), @sm args.send_mode);
+        ps!(old_manager, @fb new_manager, @sm args.send_mode);
 
         if old_manager.pubkey() != stake_pool.manager {
             panic!(
@@ -75,8 +70,6 @@ impl SyncPoolArgs {
                 old_manager.pubkey()
             );
         }
-
-        ps!(new_manager, @fb old_manager, @sm args.send_mode);
 
         let [manager_fee_account, staker] = [
             (manager_fee_account, stake_pool.manager_fee_account),
