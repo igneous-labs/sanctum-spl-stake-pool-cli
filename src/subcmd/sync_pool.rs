@@ -18,9 +18,19 @@ use super::Subcmd;
 pub struct SyncPoolArgs {
     #[arg(
         help = r#"Path to pool config file to update the stake pool's settings to.
-Make sure to set `old-manager` field in toml for a non-wallet current pool manager signer."#
+If `old-manager` is not set in the toml, it falls back to `manager`, then to the config wallet.
+Make sure to set `old-manager` field in toml for a non-wallet current pool manager signer that differs from `manager`."#
     )]
     pub pool_config: PathBuf,
+}
+
+macro_rules! det_managers {
+    (@old $old:ident, @new $new:ident, @manager $manager:ident, @payer $payer:expr, @sm $sm:expr) => {
+        let $new = &$manager;
+        ps!($manager, @fb $payer, @sm $sm);
+        ps!($old, @fb $manager, @sm $sm);
+        ps!($new, @fb $old, @sm $sm);
+    };
 }
 
 impl SyncPoolArgs {
@@ -59,7 +69,13 @@ impl SyncPoolArgs {
         let stake_pool: StakePool =
             StakePool::deserialize(&mut fetched_pool.data.as_slice()).unwrap();
 
-        ps!(old_manager, @fb payer.as_ref(), @sm args.send_mode);
+        det_managers!(
+            @old old_manager,
+            @new new_manager,
+            @manager manager,
+            @payer payer.as_ref(),
+            @sm args.send_mode
+        );
 
         if old_manager.pubkey() != stake_pool.manager {
             panic!(
@@ -68,9 +84,6 @@ impl SyncPoolArgs {
                 old_manager.pubkey()
             );
         }
-
-        let new_manager = manager;
-        ps!(new_manager, @fb old_manager, @sm args.send_mode);
 
         let [manager_fee_account, staker] = [
             (manager_fee_account, stake_pool.manager_fee_account),
@@ -146,5 +159,39 @@ impl SyncPoolArgs {
             &mut spc.signers_maybe_dup(),
         )
         .await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use solana_sdk::{signature::NullSigner, signer::Signer};
+
+    use super::*;
+
+    #[test]
+    fn det_managers_truth_table() {
+        const OLD: &str = "xFmWKsXGCXJXjCia391Qa7bfo5Mue3keMHzdmWX8quL";
+        const NEW: &str = "3VikFCvkef9k8mCLk3EqKqbAxNTP1vvM3UddT6kb6H84";
+        const PAYER: &str = "ChABYn2UHMqDHz96ckQVPvsBvSWDmAq7HB4rt58XTjdZ";
+
+        let [old_pk, new_pk, payer_pk] = [OLD, NEW, PAYER].map(|s| s.parse().unwrap());
+        let payer: &dyn Signer = &NullSigner::new(&payer_pk);
+
+        for ([expected_old, expected_new], [old, manager]) in [
+            ([payer_pk, payer_pk], [None, None]),
+            ([old_pk, old_pk], [Some(OLD), None]),
+            ([new_pk, new_pk], [None, Some(NEW)]),
+            ([old_pk, new_pk], [Some(OLD), Some(NEW)]),
+        ] {
+            det_managers!(
+                @old old,
+                @new new,
+                @manager manager,
+                @payer payer,
+                @sm TxSendMode::DumpMsg
+            );
+            assert_eq!(expected_old, old.pubkey());
+            assert_eq!(expected_new, new.pubkey());
+        }
     }
 }
